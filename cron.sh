@@ -22,9 +22,9 @@ NOTIF_ARGS="-appIcon $BASE_DIR/camping.png"
 
 if [ -z "$VIRTUAL_ENV" ]; then
     [ "${INTERACTIVE}" -eq "1" ] && echo "Not running in a virtualenv, this is not recommended! Set up your virtualenv use it by setting VIRTUAL_ENV"
-    result=`$BASE_DIR/camping.py -m ${@:1}`
+    result=`python3 $BASE_DIR/camping.py ${@:1}`
 else
-    result=`$VIRTUAL_ENV/bin/python $BASE_DIR/camping.py -m ${@:1}`
+    result=`$VIRTUAL_ENV/bin/python $BASE_DIR/camping.py ${@:1}`
 fi
 
 # See if there were any hits

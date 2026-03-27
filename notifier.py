@@ -1,77 +1,71 @@
-import random
-import sys
-import time
+"""
+Simple notifier that reads camping.py output from stdin and sends
+notifications when campsites are available.
 
+Supports two notification methods:
+  - stdout (default): prints a summary
+  - webhook: POST to a URL (e.g. Slack, Discord, ntfy.sh, etc.)
+
+Usage:
+  python camping.py --start-date ... --end-date ... --parks 232447 | python notifier.py
+  python camping.py ... | python notifier.py --webhook https://ntfy.sh/my-camping-alerts
+"""
+
+import argparse
+import json
+import sys
 from hashlib import md5
+from urllib.request import Request, urlopen
 
 from camping import SUCCESS_EMOJI
-from twitter_credentials import twitter_credentials as tc
 
-import twitter
-
-MAX_TWEET_LENGTH = 279
 DELAY_FILE_TEMPLATE = "next_{}.txt"
-DELAY_TIME = 1800
 
 
-def create_tweet(tweet):
-    tweet = tweet[:MAX_TWEET_LENGTH]
-    api = twitter.Api(
-        consumer_key=tc["consumer_key"],
-        consumer_secret=tc["consumer_secret"],
-        access_token_key=tc["access_token_key"],
-        access_token_secret=tc["access_token_secret"],
+def send_webhook(url, message):
+    req = Request(url, data=message.encode("utf-8"), method="POST")
+    req.add_header("Content-Type", "text/plain")
+    with urlopen(req) as resp:
+        return resp.status
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Campsite availability notifier")
+    parser.add_argument(
+        "--webhook",
+        help="Webhook URL to POST notifications to (e.g. ntfy.sh, Slack, Discord)",
     )
-    resp = api.PostUpdate(tweet)
-    api.CreateFavorite(resp)
-    print("The following was tweeted: ")
-    print()
-    print(tweet)
+    args = parser.parse_args()
 
-# Janky simple argument parsing.
-if len(sys.argv) != 2:
-    print("Please provide the user you want to tweet at!")
-    sys.exit(1)
+    lines = sys.stdin.read().strip().splitlines()
+    if not lines:
+        print("No input received.")
+        return
 
-user = sys.argv[1].replace("@", "")
+    first_line = lines[0]
 
-first_line = next(sys.stdin)
-first_line_hash = md5(first_line.encode("utf-8")).hexdigest()
+    if "Something went wrong" in first_line:
+        message = "Campsite checker is broken! Please investigate."
+        if args.webhook:
+            send_webhook(args.webhook, message)
+        print(message)
+        sys.exit(1)
 
-delay_file = DELAY_FILE_TEMPLATE.format(first_line_hash)
-try:
-    with open(delay_file, "r") as f:
-        call_time = int(f.read().rstrip())
-except:
-    call_time = 0
+    available_site_strings = []
+    for line in lines:
+        line = line.strip()
+        if SUCCESS_EMOJI in line:
+            available_site_strings.append(line)
 
-if call_time + random.randint(DELAY_TIME-30, DELAY_TIME+30) > int(time.time()):
-   print("It is too soon to tweet again") 
-   sys.exit(0)
+    if available_site_strings:
+        message = first_line + "\n" + "\n".join(available_site_strings)
+        if args.webhook:
+            send_webhook(args.webhook, message)
+        print("Campsites available!")
+        print(message)
+    else:
+        print("No campsites available, not notifying.")
 
 
-if "Something went wrong" in first_line:
-    create_tweet("{}, I'm broken! Please help :'(".format(user))
-    sys.exit()
-
-
-available_site_strings = []
-for line in sys.stdin:
-    line = line.strip()
-    if SUCCESS_EMOJI in line:
-        name = " ".join(line.split(":")[0].split(" ")[1:])
-        available = line.split(":")[1][1].split(" ")[0]
-        s = "{} site(s) available in {}".format(available, name)
-        available_site_strings.append(s)
-
-if available_site_strings:
-    tweet = "@{}!!! ".format(user)
-    tweet += first_line.rstrip()
-    tweet += " 🏕🏕🏕\n"
-    tweet += "\n".join(available_site_strings)
-    tweet += "\n" + "🏕" * random.randint(5, 20)  # To avoid duplicate tweets.
-    create_tweet(tweet)
-    with open(delay_file, "w") as f:
-        f.write(str(int(time.time())))
-else:
-    print("No campsites available, not tweeting 😞")
+if __name__ == "__main__":
+    main()
