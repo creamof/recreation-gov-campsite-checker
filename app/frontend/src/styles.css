@@ -160,6 +160,71 @@ code { background: #0c281c; padding: 1px 5px; border-radius: 5px; }
 .heads-up { margin-top: 9px !important; color: var(--gold) !important; }
 .curation-note { margin-top: 14px; }
 
+/* ---------------------------------------------------------------- concierge */
+.ask-box { padding: 16px; }
+.ask-box textarea {
+  width: 100%; background: #0c281c; border: 1px solid var(--line-soft); color: var(--ink);
+  border-radius: 11px; padding: 13px 15px; font-size: 16px; font-family: var(--sans);
+  resize: vertical; outline: none; line-height: 1.5;
+}
+.ask-box textarea:focus { border-color: var(--accent); }
+.ask-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+button.primary.slim { width: auto; margin-top: 0; padding: 11px 18px; }
+.examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.example-chip {
+  background: #0e2418; border: 1px solid var(--line-soft); color: var(--muted);
+  border-radius: 999px; padding: 7px 13px; font-size: 12.5px; cursor: pointer; font-family: var(--sans);
+  transition: border-color 120ms, color 120ms;
+}
+.example-chip:hover { border-color: var(--accent); color: var(--cream); }
+
+.intent-echo { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 14px; }
+
+.option-list { display: grid; gap: 16px; }
+.option-card { display: grid; grid-template-columns: 190px 1fr; gap: 0; padding: 0; overflow: hidden; }
+.option-card.active { border-color: var(--accent); }
+.option-art { padding: 0; border: 0; cursor: pointer; background: none; display: block; }
+.option-art .park-art { height: 100%; min-height: 190px; }
+.option-body { padding: 16px 18px; }
+.option-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.option-head h3 { margin: 0 0 6px; font-size: 21px; color: var(--cream); }
+.why-list { list-style: none; margin: 8px 0 10px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.why-list li {
+  font-size: 12px; background: #0c281c; border: 1px solid var(--line-soft);
+  color: var(--accent-soft); border-radius: 999px; padding: 4px 10px;
+}
+.timing-list { display: grid; gap: 8px; margin: 10px 0 14px; }
+.timing-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: #0e2418; border: 1px solid var(--line-soft); border-left-width: 3px;
+  border-radius: 10px; padding: 9px 12px;
+}
+.timing-item strong { font-size: 14px; }
+.timing-item p { margin: 2px 0 0; }
+.timing-status {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800;
+  padding: 3px 8px; border-radius: 999px; white-space: nowrap; margin-top: 2px;
+}
+.timing-act { border-left-color: var(--gold); }
+.timing-act .timing-status { background: #3a2f10; color: var(--gold); }
+.timing-upcoming { border-left-color: var(--pine); }
+.timing-upcoming .timing-status { background: #0c281c; color: var(--pine); }
+.timing-passed { border-left-color: #666; opacity: 0.75; }
+.timing-passed .timing-status { background: #2a2a2a; color: #a3a3a3; }
+.timing-info { border-left-color: #1e4e6b; }
+.timing-info .timing-status { background: #10314a; color: #7dd3fc; }
+
+.prep-plan { margin-top: 8px; }
+
+.headline-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.calendar-btn {
+  background: var(--gold); color: #241a04; border: 0; border-radius: 999px;
+  padding: 8px 15px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: var(--sans);
+  transition: filter 120ms;
+}
+.calendar-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.calendar-btn:disabled { opacity: 0.6; }
+
 /* ---------------------------------------------------------------- planner */
 .intro h2 { font-size: 28px; margin: 10px 0 8px; line-height: 1.2; color: var(--cream); }
 .intro p { color: var(--muted); margin: 0 0 18px; max-width: 62ch; line-height: 1.6; }
@@ -260,7 +325,8 @@ button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 @media (max-width: 720px) {
   .grid2, .lottery-grid, .guide-columns, .fact-row { grid-template-columns: 1fr; }
-  .park-hero { grid-template-columns: 1fr; }
+  .park-hero, .option-card { grid-template-columns: 1fr; }
+  .option-art .park-art { min-height: 150px; }
   .park-hero-text { padding: 0 20px 22px; }
   .park-hero-art { min-height: 200px; }
   .topbar { flex-direction: column; align-items: flex-start; }

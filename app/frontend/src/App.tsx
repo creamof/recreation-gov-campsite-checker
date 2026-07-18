@@ -7,11 +7,12 @@ import TimelineView from "./components/TimelineView";
 import LotteryExplorer from "./components/LotteryExplorer";
 import ParkExplorer from "./components/ParkExplorer";
 import ParkDetail from "./components/ParkDetail";
+import Concierge from "./components/Concierge";
 
-type Tab = "explore" | "plan" | "lotteries";
+type Tab = "ideas" | "explore" | "plan" | "lotteries";
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>("explore");
+  const [tab, setTab] = useState<Tab>("ideas");
   const [openPark, setOpenPark] = useState<string | null>(null);
   const [target, setTarget] = useState<SearchResult | null>(null);
   const [defaultNights, setDefaultNights] = useState<number>(3);
@@ -84,6 +85,9 @@ export default function App() {
           </div>
         </div>
         <nav className="tabs">
+          <button className={tab === "ideas" ? "active" : ""} onClick={() => setTab("ideas")}>
+            Trip ideas
+          </button>
           <button className={tab === "explore" ? "active" : ""} onClick={() => setTab("explore")}>
             Explore parks
           </button>
@@ -97,6 +101,15 @@ export default function App() {
       </header>
 
       <main className="content">
+        {tab === "ideas" && (
+          <Concierge
+            onOpenPark={(slug) => {
+              setOpenPark(slug);
+              setTab("explore");
+            }}
+          />
+        )}
+
         {tab === "explore" &&
           (openPark ? (
             <ParkDetail slug={openPark} onBack={() => setOpenPark(null)} onPlanTarget={planFromGuide} />

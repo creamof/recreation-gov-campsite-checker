@@ -10,9 +10,20 @@ planning brain on top of the same recreation.gov APIs.
 
 | # | Capability | Status |
 |---|------------|--------|
-| 1 | **Booking timeline planner** — pick a campground or permit + your dates, and get an exact timeline: when the reservation window opens, when a lottery closes, and what to do on each date so you don't miss it. | ✅ **Milestone 1 — built** |
-| 2 | **Explore parks field guide** — eight flagship parks, each with hand-drawn poster artwork, curated trip suggestions wired into the planner, things to do beyond the campsite, places to eat, and camp logistics (showers, laundry, resupply, connectivity). | ✅ **Milestone 1.5 — built** |
-| 3 | **Last-minute availability alerts** — watch specific campgrounds/dates and get a web-push notification the moment a cancellation frees a site. | 🔜 Milestone 2 — foundation in place (installable PWA + service-worker push handlers already wired) |
+| 1 | **Trip concierge (AI-driven search)** — say what you're dreaming about in your own words ("waterfalls in Yosemite with the kids in July"); get curated trips that fit, each with a timing brief: which lottery closes when, which booking window opens when, and whether each moment is upcoming / act-now / passed. | ✅ **Built** |
+| 2 | **Prep calendars with reminders** — one click merges every booking moment across a trip (campground windows + permit lotteries) into a chronological prep calendar, exportable as an .ics file whose events carry built-in alarms (day-before + 30-min warnings), so deadlines hit your phone. | ✅ **Built** |
+| 3 | **Booking timeline planner** — pick any campground or permit + your dates, and get an exact timeline: when the reservation window opens, when a lottery closes, what to do on each date. | ✅ **Built** |
+| 4 | **Explore parks field guide** — eight flagship parks with hand-drawn poster artwork, curated trips wired into the planner, things to do, places to eat, and camp logistics (showers, laundry, resupply, connectivity). | ✅ **Built** |
+| 5 | **Last-minute availability alerts** — watch specific campgrounds/dates and get a web-push notification the moment a cancellation frees a site. | 🔜 Next milestone — foundation in place (installable PWA + service-worker push handlers already wired) |
+
+### How the concierge parses your words
+
+The concierge is local-first: a deterministic intent engine (months, seasons,
+interests, party, place mentions) that works fully offline. If the backend has
+an `ANTHROPIC_API_KEY` set, parsing upgrades to Claude (`claude-opus-4-8` via
+the Anthropic SDK, structured output into the same `Intent` schema) with
+automatic fallback to the local engine on any failure — the feature never
+breaks the app. Set `TRAILHEAD_CLAUDE_MODEL` to override the model.
 
 ## Why a timeline, not just a search
 
@@ -34,14 +45,16 @@ The planner encodes these rules and turns them into a dated, actionable plan.
 ```
 app/
 ├── backend/                 FastAPI service (reuses the repo's recreation.gov API knowledge)
-│   ├── main.py              API routes: /search, /timeline, /lotteries, /parks, /availability
+│   ├── main.py              API routes: /concierge, /prepare, /ics, /search, /timeline, /lotteries, /parks, /availability
+│   ├── concierge.py         NL intent parsing (local + optional Claude) → scored trip options + timing briefs
+│   ├── prep.py              trip-level prep calendars + .ics export with VALARM reminders
 │   ├── recreation.py        recreation.gov client (search + metadata + availability)
 │   ├── booking_rules.py     rolling-window rules engine (+ Yosemite override)
 │   ├── lotteries.py         seed data for well-known backcountry lotteries
 │   ├── parks.py             curated field guide: trips, activities, eats, amenities
 │   ├── timeline.py          the planning brain — pure, unit-tested, works offline
 │   ├── schemas.py           pydantic models
-│   └── tests/               19 unit tests (timeline engine + parks guide)
+│   └── tests/               39 unit tests (timeline, parks, concierge, prep, ICS)
 └── frontend/                React + TypeScript PWA (Vite)
     ├── src/components/ParkArt.tsx    hand-drawn WPA-poster SVG art per park
     ├── src/components/Park*.tsx      explore grid + park guide pages

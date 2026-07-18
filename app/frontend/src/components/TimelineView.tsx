@@ -1,4 +1,6 @@
+import { useState } from "react";
 import type { TimelinePlan, TimelineStep } from "../types";
+import { downloadIcs } from "../api";
 
 const KIND_ICON: Record<TimelineStep["kind"], string> = {
   prep: "🧭",
@@ -20,6 +22,19 @@ function fmt(when: string | null): string {
 }
 
 export default function TimelineView({ plan }: { plan: TimelinePlan }) {
+  const [exportState, setExportState] = useState<"idle" | "busy" | "done" | "error">("idle");
+  const exportable = plan.steps.filter((s) => s.when && !s.is_past).length;
+
+  async function exportCalendar() {
+    setExportState("busy");
+    try {
+      await downloadIcs(plan.target.name, plan.steps);
+      setExportState("done");
+    } catch {
+      setExportState("error");
+    }
+  }
+
   return (
     <section className="timeline">
       <div className={`headline ${plan.strategy}`}>
@@ -31,11 +46,24 @@ export default function TimelineView({ plan }: { plan: TimelinePlan }) {
           {plan.rule_name && <span className="chip">{plan.rule_name}</span>}
         </div>
         <h3>{plan.headline}</h3>
-        {plan.verify_url && (
-          <a className="verify" href={plan.verify_url} target="_blank" rel="noreferrer">
-            Confirm current rules on recreation.gov →
-          </a>
-        )}
+        <div className="headline-actions">
+          {plan.verify_url && (
+            <a className="verify" href={plan.verify_url} target="_blank" rel="noreferrer">
+              Confirm current rules →
+            </a>
+          )}
+          {exportable > 0 && (
+            <button className="calendar-btn" onClick={exportCalendar} disabled={exportState === "busy"}>
+              {exportState === "busy"
+                ? "Exporting…"
+                : exportState === "done"
+                  ? "✅ Added — open the .ics file"
+                  : exportState === "error"
+                    ? "Export failed — retry"
+                    : `🔔 Add ${exportable} reminder${exportable > 1 ? "s" : ""} to my calendar`}
+            </button>
+          )}
+        </div>
       </div>
 
       <ol className="steps">
@@ -64,10 +92,11 @@ export default function TimelineView({ plan }: { plan: TimelinePlan }) {
 
       <div className="watch-cta card">
         <div>
-          <strong>Missed the window or it's sold out?</strong>
+          <strong>Don't let a date slip.</strong>
           <p className="muted">
-            Last-minute cancellations open up constantly. Availability watches with web-push alerts
-            are coming in Milestone 2 — this app is already installable so notifications will work.
+            The calendar export above puts every deadline on your phone with built-in alarms — a
+            day-before nudge plus a 30-minute warning for window-open moments. Live cancellation
+            watches with push alerts are the next milestone.
           </p>
         </div>
       </div>

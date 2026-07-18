@@ -110,6 +110,45 @@ export interface ParkAmenities {
   heads_up: string;
 }
 
+/* ---- Concierge ---- */
+
+export interface Intent {
+  months: number[];
+  interests: string[];
+  party: string | null;
+  places: string[];
+  summary: string;
+}
+
+export interface TimingItem {
+  label: string;
+  when: string | null;
+  status: "upcoming" | "act-now" | "passed" | "info";
+  detail: string;
+}
+
+export interface TripOption {
+  park_slug: string;
+  park_name: string;
+  state: string;
+  trip_title: string;
+  style: string;
+  nights: number;
+  best_months: string;
+  summary: string;
+  score: number;
+  why: string[];
+  timing: TimingItem[];
+}
+
+export interface ConciergeResponse {
+  intent: Intent;
+  engine: "claude" | "local";
+  target_month: string;
+  arrival: string;
+  options: TripOption[];
+}
+
 export interface ParkGuide extends Omit<ParkSummary, "trip_count"> {
   description: string;
   best_seasons: string;

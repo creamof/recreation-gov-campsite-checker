@@ -1,4 +1,12 @@
-import type { LotteryResponse, ParkGuide, ParkSummary, SearchResponse, TimelinePlan } from "./types";
+import type {
+  ConciergeResponse,
+  LotteryResponse,
+  ParkGuide,
+  ParkSummary,
+  SearchResponse,
+  TimelinePlan,
+  TimelineStep,
+} from "./types";
 
 // Empty base -> same origin (prod, or dev via Vite's /api proxy).
 const BASE = import.meta.env.VITE_API_BASE ?? "";
@@ -46,4 +54,50 @@ export async function getParks(): Promise<{ parks: ParkSummary[] }> {
 export async function getPark(slug: string): Promise<ParkGuide> {
   const res = await fetch(`${BASE}/api/parks/${slug}`);
   return json<ParkGuide>(res);
+}
+
+export async function askConcierge(body: {
+  query: string;
+  month?: number | null;
+  year?: number | null;
+}): Promise<ConciergeResponse> {
+  const res = await fetch(`${BASE}/api/concierge`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return json<ConciergeResponse>(res);
+}
+
+export async function preparePlan(body: {
+  park_slug: string;
+  trip_title: string;
+  month?: number | null;
+  year?: number | null;
+}): Promise<TimelinePlan> {
+  const res = await fetch(`${BASE}/api/prepare`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return json<TimelinePlan>(res);
+}
+
+/** Download the plan's key dates as a calendar file with reminder alarms. */
+export async function downloadIcs(title: string, steps: TimelineStep[]): Promise<void> {
+  const res = await fetch(`${BASE}/api/ics`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, steps }),
+  });
+  if (!res.ok) throw new Error(`Calendar export failed (${res.status})`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "trailhead-plan.ics";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }

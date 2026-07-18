@@ -1,0 +1,188 @@
+import { useState } from "react";
+import type { ConciergeResponse, TimelinePlan, TripOption } from "../types";
+import { askConcierge, preparePlan } from "../api";
+import ParkArt from "./ParkArt";
+import TimelineView from "./TimelineView";
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const EXAMPLES = [
+  "Waterfalls and granite in Yosemite with the kids in July",
+  "I finally want to summit Half Dome this summer",
+  "Somewhere with geysers and wildlife in June",
+  "Desert stargazing weekend with friends this winter",
+];
+
+const STATUS_META: Record<string, { label: string; cls: string }> = {
+  "act-now": { label: "act now", cls: "timing-act" },
+  upcoming: { label: "upcoming", cls: "timing-upcoming" },
+  passed: { label: "passed", cls: "timing-passed" },
+  info: { label: "note", cls: "timing-info" },
+};
+
+export default function Concierge({ onOpenPark }: { onOpenPark: (slug: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [month, setMonth] = useState<number | "">("");
+  const [result, setResult] = useState<ConciergeResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [plan, setPlan] = useState<TimelinePlan | null>(null);
+  const [planFor, setPlanFor] = useState<string | null>(null);
+  const [planLoading, setPlanLoading] = useState(false);
+
+  async function ask(text?: string) {
+    const q = (text ?? query).trim();
+    if (!q) return;
+    if (text) setQuery(text);
+    setLoading(true);
+    setError(null);
+    setPlan(null);
+    setPlanFor(null);
+    try {
+      setResult(await askConcierge({ query: q, month: month || null }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function buildPrep(opt: TripOption) {
+    setPlanLoading(true);
+    setPlanFor(`${opt.park_slug}:${opt.trip_title}`);
+    setError(null);
+    try {
+      const monthNum = result ? new Date(result.arrival + "T00:00:00").getMonth() + 1 : month || undefined;
+      const yearNum = result ? new Date(result.arrival + "T00:00:00").getFullYear() : undefined;
+      setPlan(
+        await preparePlan({
+          park_slug: opt.park_slug,
+          trip_title: opt.trip_title,
+          month: monthNum,
+          year: yearNum,
+        })
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not build the prep calendar.");
+      setPlanFor(null);
+    } finally {
+      setPlanLoading(false);
+    }
+  }
+
+  return (
+    <section className="concierge">
+      <div className="hero">
+        <p className="eyebrow">Trip concierge</p>
+        <h2>Tell me what you're dreaming about.</h2>
+        <p className="lede">
+          A place, a month, a vibe — in your own words. You'll get curated trips that fit, with the
+          booking windows and lottery deadlines already worked out, and reminders you can put on
+          your calendar.
+        </p>
+      </div>
+
+      <div className="ask-box card">
+        <textarea
+          rows={2}
+          placeholder='e.g. "Waterfalls in Yosemite with the kids in July" or "finally do Half Dome this summer"'
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              ask();
+            }
+          }}
+        />
+        <div className="ask-controls">
+          <label className="inline">
+            Month
+            <select value={month} onChange={(e) => setMonth(e.target.value ? Number(e.target.value) : "")}>
+              <option value="">From my words / flexible</option>
+              {MONTHS.map((m, i) => (
+                <option key={m} value={i + 1}>{m}</option>
+              ))}
+            </select>
+          </label>
+          <button className="primary slim" onClick={() => ask()} disabled={loading || !query.trim()}>
+            {loading ? "Thinking…" : "Find my trips"}
+          </button>
+        </div>
+        {!result && (
+          <div className="examples">
+            {EXAMPLES.map((ex) => (
+              <button key={ex} className="example-chip" onClick={() => ask(ex)}>
+                {ex}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {error && <div className="error">{error}</div>}
+
+      {result && (
+        <>
+          <div className="intent-echo">
+            <span className="chip">Heard: {result.intent.summary}</span>
+            <span className="chip">Planning for {result.target_month}</span>
+            {result.engine === "claude" && <span className="chip chip-high">AI parsed</span>}
+          </div>
+
+          <div className="option-list">
+            {result.options.map((opt) => {
+              const key = `${opt.park_slug}:${opt.trip_title}`;
+              const active = planFor === key;
+              return (
+                <article key={key} className={`option-card card ${active ? "active" : ""}`}>
+                  <button className="option-art" onClick={() => onOpenPark(opt.park_slug)} title={`Open the ${opt.park_name} guide`}>
+                    <ParkArt slug={opt.park_slug} />
+                  </button>
+                  <div className="option-body">
+                    <div className="option-head">
+                      <div>
+                        <p className="eyebrow">{opt.park_name} · {opt.state}</p>
+                        <h3>{opt.trip_title}</h3>
+                      </div>
+                      <span className={`chip style-${opt.style}`}>{opt.style}</span>
+                    </div>
+                    <p className="muted">{opt.summary}</p>
+                    <ul className="why-list">
+                      {opt.why.map((w, i) => (
+                        <li key={i}>{w}</li>
+                      ))}
+                    </ul>
+                    <div className="timing-list">
+                      {opt.timing.map((t, i) => (
+                        <div key={i} className={`timing-item ${STATUS_META[t.status]?.cls ?? ""}`}>
+                          <span className="timing-status">{STATUS_META[t.status]?.label ?? t.status}</span>
+                          <div>
+                            <strong>{t.label}</strong>
+                            <p className="muted small">{t.detail}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button className="primary slim" onClick={() => buildPrep(opt)} disabled={planLoading}>
+                      {active && planLoading ? "Building…" : "📅 Build my prep calendar"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          {plan && (
+            <div className="prep-plan">
+              <TimelineView plan={plan} />
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}

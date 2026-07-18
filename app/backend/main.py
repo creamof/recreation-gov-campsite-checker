@@ -19,12 +19,15 @@ from datetime import date
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 
+import concierge
 import recreation
 from lotteries import all_lotteries
 from parks import all_parks, get_park
-from schemas import SearchResult, TimelinePlan, TimelineRequest
+from prep import build_trip_plan, find_trip, steps_to_ics
+from schemas import SearchResult, TimelinePlan, TimelineRequest, TimelineStep
 from timeline import build_timeline
 
 app = FastAPI(
@@ -86,6 +89,56 @@ def api_search(q: str, size: int = 15) -> SearchResponse:
                 f"ID manually. ({exc})"
             ),
         )
+
+
+class ConciergeRequest(BaseModel):
+    query: str
+    month: int | None = None
+    year: int | None = None
+
+
+@app.post("/api/concierge")
+def api_concierge(req: ConciergeRequest) -> dict:
+    """Free text in → parsed intent + curated, time-aware trip options."""
+    q = req.query.strip()
+    if not q:
+        raise HTTPException(status_code=422, detail="Tell me what you're dreaming about first.")
+    if req.month is not None and not 1 <= req.month <= 12:
+        raise HTTPException(status_code=422, detail="Month must be 1-12.")
+    return concierge.suggest(q, month=req.month, year=req.year)
+
+
+class PrepareRequest(BaseModel):
+    park_slug: str
+    trip_title: str
+    month: int | None = None
+    year: int | None = None
+
+
+@app.post("/api/prepare", response_model=TimelinePlan)
+def api_prepare(req: PrepareRequest) -> TimelinePlan:
+    """Full prep calendar for a curated trip: every window + lottery merged."""
+    found = find_trip(req.park_slug, req.trip_title)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Unknown trip.")
+    park, trip = found
+    return build_trip_plan(park, trip, req.month, req.year)
+
+
+class IcsRequest(BaseModel):
+    title: str
+    steps: list[TimelineStep]
+
+
+@app.post("/api/ics")
+def api_ics(req: IcsRequest) -> Response:
+    """Export timeline steps as a calendar file with reminder alarms."""
+    ics = steps_to_ics(req.title, req.steps)
+    return Response(
+        content=ics,
+        media_type="text/calendar",
+        headers={"Content-Disposition": 'attachment; filename="trailhead-plan.ics"'},
+    )
 
 
 @app.get("/api/parks")
