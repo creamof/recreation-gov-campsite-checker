@@ -231,7 +231,7 @@ button.primary.slim { width: auto; margin-top: 0; padding: 11px 18px; }
 .intro p { color: var(--muted); margin: 0 0 18px; max-width: 62ch; line-height: 1.6; }
 
 .search-box {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; flex-direction: row; align-items: center; gap: 10px;
   background: var(--card); border: 1px solid var(--line-soft); border-radius: 13px; padding: 13px 15px;
 }
 .search-box input { flex: 1; background: none; border: 0; color: var(--ink); font-size: 16px; outline: none; font-family: var(--sans); }

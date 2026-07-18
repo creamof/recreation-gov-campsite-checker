@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Watch } from "../types";
+import type { SearchResult, Watch } from "../types";
 import {
   checkWatch,
   createWatch,
@@ -7,6 +7,7 @@ import {
   dismissWatchAlert,
   getPushConfig,
   getWatches,
+  search,
   subscribePush,
 } from "../api";
 
@@ -53,7 +54,7 @@ export default function WatchPanel() {
       if (typeof Notification !== "undefined" && Notification.permission === "granted") {
         try {
           const reg = await navigator.serviceWorker?.ready;
-          await reg?.showNotification(`🏕 ${w.name}: site available!`, {
+          await reg?.showNotification(`🏕️ ${w.name}: site available!`, {
             body: `${w.alert!.available} site(s) open for ${fmtDate(w.arrival)} – book before it's gone.`,
             icon: "/icon.svg",
             badge: "/icon.svg",
@@ -231,6 +232,8 @@ export default function WatchPanel() {
   );
 }
 
+type Chosen = { id: string; name: string; parent?: string | null };
+
 function NewWatchForm({
   onCreate,
   busy,
@@ -238,29 +241,157 @@ function NewWatchForm({
   onCreate: (body: { campground_id: string; name: string; arrival: string; departure: string }) => void;
   busy: boolean;
 }) {
-  const [name, setName] = useState("");
-  const [cgId, setCgId] = useState("");
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchNote, setSearchNote] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Chosen | null>(null);
+  const [showManual, setShowManual] = useState(false);
   const [arrival, setArrival] = useState("");
   const [departure, setDeparture] = useState("");
-  const valid = cgId.trim().match(/^\d+$/) && arrival && departure && departure > arrival;
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Debounced search. Watches only make sense for campgrounds (permits use
+  // lotteries, not first-come inventory), so permit results are filtered out.
+  useEffect(() => {
+    if (selected) return;
+    const term = query.trim();
+    if (term.length < 2) {
+      setResults([]);
+      setSearchNote(null);
+      return;
+    }
+    const t = setTimeout(async () => {
+      abortRef.current?.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+      setSearching(true);
+      try {
+        const res = await search(term, ctrl.signal);
+        const campgrounds = res.results.filter((r) => r.entity_type === "campground");
+        setResults(campgrounds);
+        if (!res.online) {
+          setSearchNote(res.note ?? "recreation.gov is unreachable — enter the ID manually below.");
+          setShowManual(true);
+        } else if (campgrounds.length === 0 && res.results.length > 0) {
+          setSearchNote("Only campgrounds can be watched for cancellations — those matches are permits.");
+        } else if (campgrounds.length === 0) {
+          setSearchNote("No campgrounds matched. Try another name, or enter the ID manually below.");
+        } else {
+          setSearchNote(null);
+        }
+      } catch (e) {
+        if ((e as Error).name !== "AbortError") {
+          setSearchNote("Search failed — you can enter the ID manually below.");
+          setShowManual(true);
+        }
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query, selected]);
+
+  function choose(r: SearchResult) {
+    setSelected({ id: r.id, name: r.name, parent: r.parent_name });
+    setResults([]);
+    setQuery("");
+    setSearchNote(null);
+  }
+
+  const valid = selected && arrival && departure && departure > arrival;
 
   return (
     <form
       className="card new-watch"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!valid) return;
-        onCreate({
-          campground_id: cgId.trim(),
-          name: name.trim() || `Campground ${cgId.trim()}`,
-          arrival,
-          departure,
-        });
-        setName("");
-        setCgId("");
+        if (!valid || !selected) return;
+        onCreate({ campground_id: selected.id, name: selected.name, arrival, departure });
+        setSelected(null);
+        setArrival("");
+        setDeparture("");
       }}
     >
       <h3>Watch a campground</h3>
+
+      {!selected ? (
+        <>
+          <p className="muted small">Search by name — no need to track down the recreation.gov ID.</p>
+          <label className="search-box">
+            <span className="search-icon">🔍</span>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Upper Pines, Kirk Creek, Watchman…"
+            />
+            {searching && <span className="spinner" aria-label="searching" />}
+          </label>
+          {searchNote && <div className="notice">{searchNote}</div>}
+          {results.length > 0 && (
+            <ul className="results">
+              {results.map((r) => (
+                <li key={r.id}>
+                  <button type="button" onClick={() => choose(r)}>
+                    <span className="badge campground">campground</span>
+                    <span className="result-name">{r.name}</span>
+                    <span className="muted">
+                      {[r.parent_name, [r.city, r.state].filter(Boolean).join(", ")]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="manual-toggle">
+            <button type="button" className="link" onClick={() => setShowManual((s) => !s)}>
+              {showManual ? "Hide manual entry" : "Know the ID already? Enter it manually"}
+            </button>
+          </div>
+          {showManual && <ManualWatchEntry onPick={(id, name) => setSelected({ id, name })} />}
+        </>
+      ) : (
+        <>
+          <div className="selected-bar">
+            <div>
+              <span className="badge campground">campground</span>
+              <strong>{selected.name}</strong>
+              {selected.parent && <span className="muted"> · {selected.parent}</span>}
+              <span className="muted small"> · #{selected.id}</span>
+            </div>
+            <button type="button" className="link" onClick={() => setSelected(null)}>
+              Change
+            </button>
+          </div>
+
+          <div className="grid2">
+            <label>
+              Arrival
+              <input type="date" value={arrival} onChange={(e) => setArrival(e.target.value)} />
+            </label>
+            <label>
+              Departure
+              <input type="date" value={departure} onChange={(e) => setDeparture(e.target.value)} />
+            </label>
+          </div>
+          <button className="primary" type="submit" disabled={!valid || busy}>
+            {busy ? "Adding…" : "Start watching"}
+          </button>
+        </>
+      )}
+    </form>
+  );
+}
+
+function ManualWatchEntry({ onPick }: { onPick: (id: string, name: string) => void }) {
+  const [id, setId] = useState("");
+  const [name, setName] = useState("");
+  const ok = /^\d+$/.test(id.trim());
+
+  return (
+    <div className="manual card">
       <p className="muted small">
         The ID is the number in the recreation.gov URL: <code>/camping/campgrounds/<b>232447</b></code>
       </p>
@@ -271,20 +402,17 @@ function NewWatchForm({
         </label>
         <label>
           Recreation.gov ID
-          <input value={cgId} onChange={(e) => setCgId(e.target.value)} placeholder="232447" inputMode="numeric" />
-        </label>
-        <label>
-          Arrival
-          <input type="date" value={arrival} onChange={(e) => setArrival(e.target.value)} />
-        </label>
-        <label>
-          Departure
-          <input type="date" value={departure} onChange={(e) => setDeparture(e.target.value)} />
+          <input value={id} onChange={(e) => setId(e.target.value)} placeholder="232447" inputMode="numeric" />
         </label>
       </div>
-      <button className="primary" type="submit" disabled={!valid || busy}>
-        {busy ? "Adding…" : "Start watching"}
+      <button
+        type="button"
+        className="primary slim"
+        disabled={!ok}
+        onClick={() => onPick(id.trim(), name.trim() || `Campground ${id.trim()}`)}
+      >
+        Use this campground
       </button>
-    </form>
+    </div>
   );
 }

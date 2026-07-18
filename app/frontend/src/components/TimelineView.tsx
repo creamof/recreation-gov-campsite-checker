@@ -11,6 +11,14 @@ const KIND_ICON: Record<TimelineStep["kind"], string> = {
   trip: "🏕️",
 };
 
+// Backend step titles carry a leading emoji on the key moments (🎯 book now,
+// ⏰ apply now, 🏕️ trip starts…) so the .ics calendar summary reads well. On
+// the site the rail dot already shows a per-kind icon, so strip that leading
+// emoji here — otherwise those rows show the same icon twice.
+function stripLeadingEmoji(title: string): string {
+  return title.replace(/^(?:[\p{Extended_Pictographic}\u{1F3FB}-\u{1F3FF}️‍]+)\s*/u, "");
+}
+
 function fmt(when: string | null): string {
   if (!when) return "Do now";
   const hasTime = when.includes("T");
@@ -78,7 +86,7 @@ export default function TimelineView({ plan }: { plan: TimelinePlan }) {
                 {s.is_past && <span className="chip chip-past">past</span>}
                 {s.urgency === "high" && !s.is_past && <span className="chip chip-high">act</span>}
               </div>
-              <div className="step-title">{s.title}</div>
+              <div className="step-title">{stripLeadingEmoji(s.title)}</div>
               <div className="step-detail">{s.detail}</div>
               {s.verify_url && (
                 <a href={s.verify_url} target="_blank" rel="noreferrer" className="step-link">
