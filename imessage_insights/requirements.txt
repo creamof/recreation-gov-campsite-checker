@@ -1,0 +1,3 @@
+# Only needed for the `summarize` and `digest` commands (Claude API).
+# The explore/stats commands use the Python standard library only.
+anthropic>=0.40

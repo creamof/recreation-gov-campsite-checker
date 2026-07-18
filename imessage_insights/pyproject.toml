@@ -1,0 +1,16 @@
+[project]
+name = "imessage-insights"
+version = "0.1.0"
+description = "Local, read-only explorer and group-thread analyzer for macOS Messages (iMessage + SMS)."
+requires-python = ">=3.10"
+dependencies = ["anthropic>=0.40"]
+
+[project.scripts]
+imessage-insights = "imessage_insights.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["imessage_insights"]
