@@ -16,6 +16,24 @@ planning brain on top of the same recreation.gov APIs.
 | 4 | **Explore parks field guide** — eight flagship parks rendered as vintage engraved postage stamps (perforated edges, aged paper, one ink per park in the style of the 1934 National Parks issue), curated trips wired into the planner, things to do, places to eat, and camp logistics (showers, laundry, resupply, connectivity). | ✅ **Built** |
 | 5 | **Cancellation watcher** — watch a sold-out campground for your dates; a background poller re-checks recreation.gov and raises an alert the moment sites free up, with OS notifications (and optional Web Push that works even when the app is closed). | ✅ **Built** |
 
+### Stamp artwork: making the engravings topographically true
+
+The stamps are engraved line art generated in code — one monument per park,
+hatched and ruled like the 1934 National Parks issue. The silhouettes are
+currently drawn from memory (the "75% version"). To make each profile
+match the real mountain:
+
+1. **Run locally** (needs internet): `python3 app/tools/fetch_references.py`
+   — searches Wikimedia Commons for each park's classic view, downloads a
+   reference photo per park into `app/reference/`, and writes `CREDITS.txt`
+   with the license/author of each file. Swap in your own photos freely;
+   only the `slug.jpg` filename matters.
+2. Optionally inspect a traced skyline: `pip install pillow`, then
+   `python3 app/tools/trace_silhouette.py app/reference/yosemite.jpg`
+   prints the monument's outline as an SVG path in stamp coordinates.
+3. Hand the folder back ("references are in app/reference/") and the traced
+   geometry replaces the from-memory silhouettes in `ParkArt.tsx`.
+
 ### Cancellation watcher notes
 
 * Watches persist in `app/backend/data/` (plain JSON, no database). The
