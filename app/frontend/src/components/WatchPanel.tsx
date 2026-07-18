@@ -355,11 +355,12 @@ function NewWatchForm({
       ) : (
         <>
           <div className="selected-bar">
-            <div>
+            <div className="selected-facility">
               <span className="badge campground">campground</span>
-              <strong>{selected.name}</strong>
-              {selected.parent && <span className="muted"> · {selected.parent}</span>}
-              <span className="muted small"> · #{selected.id}</span>
+              <div className="selected-text">
+                <strong>{selected.name}</strong>
+                <span className="muted">{[selected.parent, `#${selected.id}`].filter(Boolean).join(" · ")}</span>
+              </div>
             </div>
             <button type="button" className="link" onClick={() => setSelected(null)}>
               Change

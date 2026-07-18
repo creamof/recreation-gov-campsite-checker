@@ -209,10 +209,12 @@ export default function App() {
             ) : (
               <div className="planning">
                 <div className="selected-bar">
-                  <div>
+                  <div className="selected-facility">
                     <span className={`badge ${target.entity_type}`}>{target.entity_type}</span>
-                    <strong>{target.name}</strong>
-                    {target.parent_name && <span className="muted"> · {target.parent_name}</span>}
+                    <div className="selected-text">
+                      <strong>{target.name}</strong>
+                      {target.parent_name && <span className="muted">{target.parent_name}</span>}
+                    </div>
                   </div>
                   <button className="link" onClick={resetPlanner}>
                     Change

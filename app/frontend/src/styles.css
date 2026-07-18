@@ -266,10 +266,17 @@ button.primary:hover:not(:disabled) { filter: brightness(1.08); }
 button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .selected-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
   background: var(--panel); border: 1px solid var(--line-soft); border-radius: 13px; padding: 13px 15px; margin-bottom: 14px;
 }
-.selected-bar .badge { margin-right: 8px; }
+/* Badge + a two-line label (name over park), so a long name/park wraps as a
+   clean second line instead of an inline run that leaves a dangling "·". */
+.selected-facility { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.selected-facility .badge { flex-shrink: 0; }
+.selected-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.selected-text strong { color: var(--cream); line-height: 1.25; }
+.selected-text .muted { font-size: 13px; line-height: 1.25; }
+.selected-bar > button.link { flex-shrink: 0; }
 .trip-form .row-between { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
 
 /* ---------------------------------------------------------------- timeline */
