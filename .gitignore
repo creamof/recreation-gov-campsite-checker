@@ -12,3 +12,4 @@ app/frontend/node_modules/
 app/frontend/dist/
 .DS_Store
 app/frontend/*.tsbuildinfo
+app/backend/data/

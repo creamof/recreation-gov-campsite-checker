@@ -8,8 +8,9 @@ import LotteryExplorer from "./components/LotteryExplorer";
 import ParkExplorer from "./components/ParkExplorer";
 import ParkDetail from "./components/ParkDetail";
 import Concierge from "./components/Concierge";
+import WatchPanel from "./components/WatchPanel";
 
-type Tab = "ideas" | "explore" | "plan" | "lotteries";
+type Tab = "ideas" | "explore" | "plan" | "watches" | "lotteries";
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("ideas");
@@ -94,6 +95,9 @@ export default function App() {
           <button className={tab === "plan" ? "active" : ""} onClick={() => setTab("plan")}>
             Plan a booking
           </button>
+          <button className={tab === "watches" ? "active" : ""} onClick={() => setTab("watches")}>
+            Watches
+          </button>
           <button className={tab === "lotteries" ? "active" : ""} onClick={() => setTab("lotteries")}>
             Lotteries
           </button>
@@ -101,6 +105,7 @@ export default function App() {
       </header>
 
       <main className="content">
+        {tab === "watches" && <WatchPanel />}
         {tab === "ideas" && (
           <Concierge
             onOpenPark={(slug) => {
@@ -163,7 +168,7 @@ export default function App() {
           <a href="https://www.recreation.gov" target="_blank" rel="noreferrer">
             recreation.gov
           </a>{" "}
-          and the official park sites. Next up: last-minute availability alerts.
+          and the official park sites.
         </p>
       </footer>
     </div>

@@ -6,6 +6,8 @@ import type {
   SearchResponse,
   TimelinePlan,
   TimelineStep,
+  Watch,
+  WatchesResponse,
 } from "./types";
 
 // Empty base -> same origin (prod, or dev via Vite's /api proxy).
@@ -81,6 +83,52 @@ export async function preparePlan(body: {
     body: JSON.stringify(body),
   });
   return json<TimelinePlan>(res);
+}
+
+/* ---- Watches ---- */
+
+export async function getWatches(): Promise<WatchesResponse> {
+  return json<WatchesResponse>(await fetch(`${BASE}/api/watches`));
+}
+
+export async function createWatch(body: {
+  campground_id: string;
+  name: string;
+  arrival: string;
+  departure: string;
+}): Promise<Watch> {
+  const res = await fetch(`${BASE}/api/watches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return json<Watch>(res);
+}
+
+export async function checkWatch(id: string): Promise<Watch> {
+  return json<Watch>(await fetch(`${BASE}/api/watches/${id}/check`, { method: "POST" }));
+}
+
+export async function dismissWatchAlert(id: string): Promise<Watch> {
+  return json<Watch>(await fetch(`${BASE}/api/watches/${id}/dismiss`, { method: "POST" }));
+}
+
+export async function deleteWatch(id: string): Promise<void> {
+  await json(await fetch(`${BASE}/api/watches/${id}`, { method: "DELETE" }));
+}
+
+export async function getPushConfig(): Promise<{ enabled: boolean; public_key: string | null }> {
+  return json(await fetch(`${BASE}/api/push/config`));
+}
+
+export async function subscribePush(sub: PushSubscription): Promise<void> {
+  await json(
+    await fetch(`${BASE}/api/push/subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sub.toJSON()),
+    })
+  );
 }
 
 /** Download the plan's key dates as a calendar file with reminder alarms. */

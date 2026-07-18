@@ -15,6 +15,9 @@ input.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import os
 from datetime import date
 
 from fastapi import FastAPI, HTTPException
@@ -23,17 +26,44 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 import concierge
+import push
 import recreation
+import watcher
 from lotteries import all_lotteries
 from parks import all_parks, get_park
 from prep import build_trip_plan, find_trip, steps_to_ics
 from schemas import SearchResult, TimelinePlan, TimelineRequest, TimelineStep
 from timeline import build_timeline
 
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Run the cancellation-watch poller for the app's lifetime."""
+    task = None
+    if os.environ.get("TRAILHEAD_DISABLE_POLLER") != "1":
+        interval = int(os.environ.get("TRAILHEAD_WATCH_INTERVAL", "300"))
+
+        async def poll_loop() -> None:
+            while True:
+                try:
+                    await asyncio.to_thread(watcher.check_all)
+                except Exception:
+                    pass  # a bad cycle must never kill the poller
+                await asyncio.sleep(interval)
+
+        task = asyncio.create_task(poll_loop())
+    yield
+    if task:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
 app = FastAPI(
     title="National Parks Campsite & Backcountry Planner",
-    version="0.1.0",
+    version="0.2.0",
     description="Plan when to book campgrounds and apply for backcountry lotteries.",
+    lifespan=lifespan,
 )
 
 # The PWA is served from a different origin during development.
@@ -167,6 +197,74 @@ def api_timeline(req: TimelineRequest) -> TimelinePlan:
     if req.departure <= req.arrival:
         raise HTTPException(status_code=422, detail="Departure must be after arrival.")
     return build_timeline(req)
+
+
+class WatchCreate(BaseModel):
+    campground_id: str
+    name: str
+    arrival: date
+    departure: date
+
+
+@app.get("/api/watches")
+def api_watches() -> dict:
+    """All watches plus whether server-side push is configured."""
+    return {
+        "watches": [w.model_dump(mode="json") for w in watcher.load_watches()],
+        "push_enabled": push.enabled(),
+    }
+
+
+@app.post("/api/watches")
+def api_watch_create(req: WatchCreate) -> dict:
+    if req.departure <= req.arrival:
+        raise HTTPException(status_code=422, detail="Departure must be after arrival.")
+    if req.arrival <= date.today():
+        raise HTTPException(status_code=422, detail="Arrival must be in the future.")
+    if not req.campground_id.strip().isdigit():
+        raise HTTPException(status_code=422, detail="Campground ID must be the number from the recreation.gov URL.")
+    watch = watcher.add_watch(req.campground_id.strip(), req.name.strip() or f"Campground {req.campground_id}", req.arrival, req.departure)
+    # First check right away so the user sees a status immediately.
+    watch = watcher.check_watch(watch)
+    return watch.model_dump(mode="json")
+
+
+@app.post("/api/watches/{watch_id}/check")
+def api_watch_check(watch_id: str) -> dict:
+    watch = watcher.get_watch(watch_id)
+    if watch is None:
+        raise HTTPException(status_code=404, detail="Unknown watch.")
+    return watcher.check_watch(watch).model_dump(mode="json")
+
+
+@app.post("/api/watches/{watch_id}/dismiss")
+def api_watch_dismiss(watch_id: str) -> dict:
+    watch = watcher.dismiss_alert(watch_id)
+    if watch is None:
+        raise HTTPException(status_code=404, detail="Unknown watch.")
+    return watch.model_dump(mode="json")
+
+
+@app.delete("/api/watches/{watch_id}")
+def api_watch_delete(watch_id: str) -> dict:
+    if not watcher.delete_watch(watch_id):
+        raise HTTPException(status_code=404, detail="Unknown watch.")
+    return {"deleted": watch_id}
+
+
+@app.get("/api/push/config")
+def api_push_config() -> dict:
+    return {"enabled": push.enabled(), "public_key": push.public_key()}
+
+
+@app.post("/api/push/subscribe")
+def api_push_subscribe(subscription: dict) -> dict:
+    if not push.enabled():
+        raise HTTPException(status_code=400, detail="Push is not configured on this server.")
+    if "endpoint" not in subscription:
+        raise HTTPException(status_code=422, detail="Not a PushSubscription.")
+    count = push.add_subscription(subscription)
+    return {"subscribed": True, "subscriptions": count}
 
 
 @app.get("/api/availability/{campground_id}", response_model=AvailabilityResponse)

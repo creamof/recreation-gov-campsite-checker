@@ -1,9 +1,16 @@
 /**
- * ParkArt — hand-drawn, WPA-travel-poster-style SVG scenes, one per park.
+ * ParkArt — vintage engraved postage stamps, one per park.
  *
- * Each scene is flat layered silhouettes over a dusk/dawn gradient with a
- * paper-grain overlay, in a palette chosen per park. No external images —
- * everything renders offline and scales crisply at any size.
+ * Styled after the 1934 U.S. National Parks stamp issue: each park is a
+ * single-ink line engraving on aged paper, with perforated edges (true
+ * transparency via an SVG mask, so they read against any background),
+ * a hatched engraving texture, frame rules, and stamp typography with
+ * denominations that nod to the originals (Yellowstone really was the 5¢,
+ * Zion the 8¢...).
+ *
+ * The scene geometry is drawn in color and converted to the park's ink
+ * with a luminance→ink-ramp duotone filter, exactly like printing one
+ * engraving plate in a single ink.
  */
 
 interface SceneColors {
@@ -12,6 +19,157 @@ interface SceneColors {
   sun: string;
   sunRing?: string;
 }
+
+/* ------------------------------------------------------------------ inks */
+
+interface StampSpec {
+  title: string;
+  denom: string;
+  year: string;
+  ink: string; // the single engraving ink for this park
+}
+
+const STAMPS: Record<string, StampSpec> = {
+  yosemite: { title: "YOSEMITE", denom: "1¢", year: "1890", ink: "#33573d" },
+  "grand-canyon": { title: "GRAND CANYON", denom: "2¢", year: "1919", ink: "#8f3324" },
+  "grand-teton": { title: "GRAND TETON", denom: "3¢", year: "1929", ink: "#5b4a68" },
+  "joshua-tree": { title: "JOSHUA TREE", denom: "4¢", year: "1994", ink: "#8a5a24" },
+  yellowstone: { title: "YELLOWSTONE", denom: "5¢", year: "1872", ink: "#1e5c56" },
+  acadia: { title: "ACADIA", denom: "7¢", year: "1919", ink: "#2f4b66" },
+  zion: { title: "ZION", denom: "8¢", year: "1919", ink: "#7a4a28" },
+  glacier: { title: "GLACIER", denom: "9¢", year: "1910", ink: "#7a3b52" },
+};
+
+const PAPER = "#f2e8d0";
+
+function hexRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function mix(a: [number, number, number], b: [number, number, number], t: number) {
+  return a.map((v, i) => v + (b[i] - v) * t) as [number, number, number];
+}
+
+/** Luminance→ink table: shadows print dense ink, highlights stay paper. */
+function inkRamp(ink: string): { r: string; g: string; b: string } {
+  const inkRgb = hexRgb(ink);
+  const paperRgb = hexRgb(PAPER);
+  const stops = [
+    mix(inkRgb, [0, 0, 0], 0.45), // deepest shadow: ink + black
+    inkRgb, //                        midtone: pure ink
+    mix(inkRgb, paperRgb, 0.45), //   light: thinned ink
+    mix(paperRgb, inkRgb, 0.09), //   highlight: barely-tinted paper
+  ];
+  const chan = (i: number) => stops.map((s) => (s[i] / 255).toFixed(3)).join(" ");
+  return { r: chan(0), g: chan(1), b: chan(2) };
+}
+
+/* ---------------------------------------------------------- stamp chrome */
+
+// Stamp canvas: 420 × 330. Scene window: 375 × 240 at (22.5, 42).
+const W = 420;
+const H = 330;
+const WIN = { x: 22.5, y: 42, w: 375, h: 240 };
+
+function Stamp({ slug, children }: { slug: string; children: React.ReactNode }) {
+  const spec = STAMPS[slug] ?? { title: slug.toUpperCase(), denom: "·", year: "", ink: "#3f4a3f" };
+  const ramp = inkRamp(spec.ink);
+  const perf: JSX.Element[] = [];
+  for (let x = 0; x <= W; x += 15) {
+    perf.push(<circle key={`t${x}`} cx={x} cy={0} r={5.4} fill="#000" />);
+    perf.push(<circle key={`b${x}`} cx={x} cy={H} r={5.4} fill="#000" />);
+  }
+  for (let y = 15; y < H; y += 15) {
+    perf.push(<circle key={`l${y}`} cx={0} cy={y} r={5.4} fill="#000" />);
+    perf.push(<circle key={`r${y}`} cx={W} cy={y} r={5.4} fill="#000" />);
+  }
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="park-art stamp-art" role="img" aria-label={`${spec.title} vintage stamp`}>
+      <defs>
+        <mask id={`perf-${slug}`}>
+          <rect width={W} height={H} fill="#fff" />
+          {perf}
+        </mask>
+        <filter id={`ink-${slug}`} colorInterpolationFilters="sRGB">
+          <feColorMatrix
+            type="matrix"
+            values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0"
+          />
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues={ramp.r} />
+            <feFuncG type="table" tableValues={ramp.g} />
+            <feFuncB type="table" tableValues={ramp.b} />
+          </feComponentTransfer>
+        </filter>
+        <pattern id={`hatch-${slug}`} width="1" height="3" patternUnits="userSpaceOnUse">
+          <rect width="1" height="0.8" fill={spec.ink} />
+        </pattern>
+        <filter id={`grain-${slug}`}>
+          <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="2" stitchTiles="stitch" />
+          <feColorMatrix type="saturate" values="0" />
+          <feComponentTransfer>
+            <feFuncA type="linear" slope="0.055" />
+          </feComponentTransfer>
+          <feComposite operator="over" in2="SourceGraphic" />
+        </filter>
+        <radialGradient id={`age-${slug}`} cx="50%" cy="46%" r="75%">
+          <stop offset="62%" stopColor="#6b4f2a" stopOpacity="0" />
+          <stop offset="100%" stopColor="#6b4f2a" stopOpacity="0.22" />
+        </radialGradient>
+      </defs>
+
+      <g mask={`url(#perf-${slug})`}>
+        {/* aged paper */}
+        <rect width={W} height={H} fill={PAPER} />
+        <rect width={W} height={H} fill={`url(#age-${slug})`} />
+
+        {/* outer rule */}
+        <rect x={11} y={11} width={W - 22} height={H - 22} fill="none" stroke={spec.ink} strokeWidth="1" opacity="0.55" />
+
+        {/* header */}
+        <text x={W / 2} y={31} textAnchor="middle" fill={spec.ink} fontFamily="'Fraunces Variable', Georgia, serif" fontSize="12.5" fontWeight={620} letterSpacing="3.2">
+          · UNITED STATES · NATIONAL PARKS ·
+        </text>
+
+        {/* engraved scene, printed in one ink (scaled to exactly fill the window) */}
+        <g transform={`translate(${WIN.x} ${WIN.y}) scale(0.75)`} filter={`url(#ink-${slug})`}>
+          {children}
+        </g>
+        {/* engraving hatch + window frame */}
+        <rect x={WIN.x} y={WIN.y} width={WIN.w} height={WIN.h} fill={`url(#hatch-${slug})`} opacity="0.13" />
+        <rect x={WIN.x} y={WIN.y} width={WIN.w} height={WIN.h} fill="none" stroke={spec.ink} strokeWidth="2.5" />
+        <rect x={WIN.x - 4} y={WIN.y - 4} width={WIN.w + 8} height={WIN.h + 8} fill="none" stroke={spec.ink} strokeWidth="0.8" opacity="0.6" />
+
+        {/* bottom band: year · NAME · denomination (name shrinks when long) */}
+        <text x={26} y={310} fill={spec.ink} fontFamily="'Fraunces Variable', Georgia, serif" fontSize="11" fontWeight={600} letterSpacing="0.5" opacity="0.85">
+          EST. {spec.year}
+        </text>
+        <text
+          x={W / 2}
+          y={313}
+          textAnchor="middle"
+          fill={spec.ink}
+          fontFamily="'Fraunces Variable', Georgia, serif"
+          fontSize={spec.title.length > 10 ? 19 : 23}
+          fontWeight={700}
+          letterSpacing={spec.title.length > 10 ? 1.5 : 2.5}
+        >
+          {spec.title}
+        </text>
+        <text x={W - 26} y={313} textAnchor="end" fill={spec.ink} fontFamily="'Fraunces Variable', Georgia, serif" fontSize="21" fontWeight={700}>
+          {spec.denom}
+        </text>
+
+        {/* print grain over everything */}
+        <rect width={W} height={H} filter={`url(#grain-${slug})`} opacity="0.6" fill="transparent" />
+      </g>
+    </svg>
+  );
+}
+
+/* ------------------------------------------------------------ scene frame */
 
 function Frame({
   colors,
@@ -26,23 +184,14 @@ function Frame({
   sunY?: number;
   sunR?: number;
 }) {
-  // Unique-enough gradient ids so multiple posters coexist in one DOM.
   const gid = `sky-${colors.skyTop.slice(1)}-${colors.skyBottom.slice(1)}`;
   return (
-    <svg viewBox="0 0 500 320" preserveAspectRatio="xMidYMid slice" role="img" className="park-art">
+    <g>
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={colors.skyTop} />
           <stop offset="100%" stopColor={colors.skyBottom} />
         </linearGradient>
-        <filter id="grain">
-          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" />
-          <feColorMatrix type="saturate" values="0" />
-          <feComponentTransfer>
-            <feFuncA type="linear" slope="0.06" />
-          </feComponentTransfer>
-          <feComposite operator="over" in2="SourceGraphic" />
-        </filter>
       </defs>
       <rect width="500" height="320" fill={`url(#${gid})`} />
       {colors.sunRing && (
@@ -50,8 +199,7 @@ function Frame({
       )}
       <circle cx={sunX} cy={sunY} r={sunR} fill={colors.sun} />
       {children}
-      <rect width="500" height="320" filter="url(#grain)" opacity="0.5" fill="transparent" />
-    </svg>
+    </g>
   );
 }
 
@@ -261,14 +409,16 @@ const SCENES: Record<string, () => JSX.Element> = {
 };
 
 export default function ParkArt({ slug }: { slug: string }) {
-  const Scene = SCENES[slug];
-  if (!Scene) {
-    // Unknown park: generic peaks fallback.
-    return (
+  const Scene =
+    SCENES[slug] ??
+    (() => (
       <Frame colors={{ skyTop: "#bde0fe", skyBottom: "#ffc8dd", sun: "#fff9ec" }}>
         <path d="M0 320 L0 220 L120 120 L240 220 L360 130 L500 230 L500 320 Z" fill="#31465f" />
       </Frame>
-    );
-  }
-  return <Scene />;
+    ));
+  return (
+    <Stamp slug={slug}>
+      <Scene />
+    </Stamp>
+  );
 }

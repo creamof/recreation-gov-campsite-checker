@@ -62,6 +62,29 @@ export interface LotteryResponse {
   lotteries: Lottery[];
 }
 
+/* ---- Watches ---- */
+
+export interface Watch {
+  id: string;
+  campground_id: string;
+  name: string;
+  arrival: string;
+  departure: string;
+  active: boolean;
+  created_at: string;
+  last_checked: string | null;
+  status: "unknown" | "available" | "unavailable" | "error" | "expired";
+  available: number | null;
+  total: number | null;
+  alert: { at: string; available: number } | null;
+  error: string | null;
+}
+
+export interface WatchesResponse {
+  watches: Watch[];
+  push_enabled: boolean;
+}
+
 /* ---- Parks guide ---- */
 
 export interface ParkSummary {

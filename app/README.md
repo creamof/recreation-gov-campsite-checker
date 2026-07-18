@@ -13,8 +13,22 @@ planning brain on top of the same recreation.gov APIs.
 | 1 | **Trip concierge (AI-driven search)** — say what you're dreaming about in your own words ("waterfalls in Yosemite with the kids in July"); get curated trips that fit, each with a timing brief: which lottery closes when, which booking window opens when, and whether each moment is upcoming / act-now / passed. | ✅ **Built** |
 | 2 | **Prep calendars with reminders** — one click merges every booking moment across a trip (campground windows + permit lotteries) into a chronological prep calendar, exportable as an .ics file whose events carry built-in alarms (day-before + 30-min warnings), so deadlines hit your phone. | ✅ **Built** |
 | 3 | **Booking timeline planner** — pick any campground or permit + your dates, and get an exact timeline: when the reservation window opens, when a lottery closes, what to do on each date. | ✅ **Built** |
-| 4 | **Explore parks field guide** — eight flagship parks with hand-drawn poster artwork, curated trips wired into the planner, things to do, places to eat, and camp logistics (showers, laundry, resupply, connectivity). | ✅ **Built** |
-| 5 | **Last-minute availability alerts** — watch specific campgrounds/dates and get a web-push notification the moment a cancellation frees a site. | 🔜 Next milestone — foundation in place (installable PWA + service-worker push handlers already wired) |
+| 4 | **Explore parks field guide** — eight flagship parks rendered as vintage engraved postage stamps (perforated edges, aged paper, one ink per park in the style of the 1934 National Parks issue), curated trips wired into the planner, things to do, places to eat, and camp logistics (showers, laundry, resupply, connectivity). | ✅ **Built** |
+| 5 | **Cancellation watcher** — watch a sold-out campground for your dates; a background poller re-checks recreation.gov and raises an alert the moment sites free up, with OS notifications (and optional Web Push that works even when the app is closed). | ✅ **Built** |
+
+### Cancellation watcher notes
+
+* Watches persist in `app/backend/data/` (plain JSON, no database). The
+  backend's poller re-checks every active watch on an interval
+  (`TRAILHEAD_WATCH_INTERVAL` seconds, default 300). The server must be
+  running to watch — that's the whole point.
+* **Notifications**: with the tab open (or the PWA installed), alerts fire OS
+  notifications via the service worker — zero setup. For push that works with
+  the app fully closed, generate VAPID keys (`npx web-push generate-vapid-keys`)
+  and set `TRAILHEAD_VAPID_PUBLIC_KEY`, `TRAILHEAD_VAPID_PRIVATE_KEY`,
+  `TRAILHEAD_VAPID_EMAIL` — the UI picks it up automatically.
+* **Demo mode** (development): `TRAILHEAD_DEMO_AVAILABILITY="232447:3/40,232450:0/73"`
+  fakes availability per campground so the whole loop can be exercised offline.
 
 ### How the concierge parses your words
 
