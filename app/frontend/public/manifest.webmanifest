@@ -1,0 +1,17 @@
+{
+  "name": "Trailhead — Campsite & Backcountry Planner",
+  "short_name": "Trailhead",
+  "description": "Plan when to book national park campgrounds and apply for backcountry permit lotteries, and get last-minute availability alerts.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1f17",
+  "theme_color": "#1b4332",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

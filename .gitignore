@@ -1,5 +1,14 @@
 /myvenv/
 __pycache__
+*.pyc
+.pytest_cache/
 /next*
 /tweetlog
 /twitter_credentials.py
+
+# App (web + PWA)
+app/backend/.venv/
+app/frontend/node_modules/
+app/frontend/dist/
+.DS_Store
+app/frontend/*.tsbuildinfo

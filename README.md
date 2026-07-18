@@ -4,6 +4,12 @@
 
 This script scrapes the https://recreation.gov website for campsite availabilities.
 
+> ### 🏔️ New: Trailhead — a web app + phone app (PWA) built on this
+> A booking **timeline planner** (when to book campgrounds / when to apply for
+> backcountry lotteries) plus a foundation for **last-minute availability
+> alerts**. See [`app/README.md`](app/README.md) for the FastAPI backend +
+> React PWA. The CLI below still works standalone.
+
 ## Example Usage
 
 ```
