@@ -203,6 +203,183 @@ function Frame({
   );
 }
 
+/* ----------------------------------------------------- engraving engine */
+/**
+ * Engraved scenes are drawn in GRAYSCALE line work on near-white ground —
+ * the stamp's duotone ramp then prints them in the park's ink, exactly like
+ * an engraving plate. Form is modeled the way engravers did it: families of
+ * parallel lines clipped to each surface, denser where the form turns away
+ * from the light, plus ruled sky lines that break around the sun.
+ */
+
+const INK_DARK = "#1c1c1c";
+const INK_MID = "#4a4a4a";
+
+/** A family of parallel lines at `angle`, clipped to a region path. */
+function Hatch({
+  id,
+  region,
+  angle,
+  spacing,
+  width = 1,
+  color = INK_DARK,
+  opacity = 1,
+}: {
+  id: string;
+  region: string;
+  angle: number;
+  spacing: number;
+  width?: number;
+  color?: string;
+  opacity?: number;
+}) {
+  const lines: JSX.Element[] = [];
+  for (let y = -360; y <= 680; y += spacing) {
+    lines.push(<line key={y} x1={-360} y1={y} x2={860} y2={y} />);
+  }
+  return (
+    <g>
+      <clipPath id={id}>
+        <path d={region} clipRule="evenodd" />
+      </clipPath>
+      <g clipPath={`url(#${id})`} stroke={color} strokeWidth={width} opacity={opacity}>
+        <g transform={`rotate(${angle} 250 160)`}>{lines}</g>
+      </g>
+    </g>
+  );
+}
+
+/** Ruled horizontal sky lines that leave a halo gap around the sun. */
+function SkyLines({
+  yTop,
+  yBottom,
+  sunX,
+  sunY,
+  sunR,
+  x0 = 0,
+  x1 = 500,
+}: {
+  yTop: number;
+  yBottom: number;
+  sunX: number;
+  sunY: number;
+  sunR: number;
+  x0?: number;
+  x1?: number;
+}) {
+  const halo = sunR + 9;
+  let d = "";
+  // Denser near the horizon, opening up toward the top — classic sky ruling.
+  let y = yBottom;
+  let gap = 3.6;
+  while (y > yTop) {
+    if (Math.abs(y - sunY) < halo) {
+      const dx = Math.sqrt(halo * halo - (y - sunY) * (y - sunY)) + 3;
+      const leftEnd = sunX - dx;
+      const rightStart = sunX + dx;
+      if (leftEnd > x0) d += `M${x0} ${y}L${leftEnd.toFixed(1)} ${y}`;
+      if (rightStart < x1) d += `M${rightStart.toFixed(1)} ${y}L${x1} ${y}`;
+    } else {
+      d += `M${x0} ${y}L${x1} ${y}`;
+    }
+    y -= gap;
+    gap *= 1.06;
+  }
+  return <path d={d} stroke={INK_MID} strokeWidth="0.75" fill="none" opacity="0.8" />;
+}
+
+/** A small engraved conifer: trunk stroke + chevron branches. */
+function EngravedTree({ x, y, h }: { x: number; y: number; h: number }) {
+  const rows = Math.max(3, Math.round(h / 6));
+  const parts: string[] = [`M${x} ${y}L${x} ${y - h}`];
+  for (let i = 0; i < rows; i++) {
+    const t = i / rows;
+    const yy = y - h + 4 + t * (h - 6);
+    const w = 2 + t * (h * 0.32);
+    parts.push(`M${x - w} ${yy + 3}L${x} ${yy}L${x + w} ${yy + 3}`);
+  }
+  return <path d={parts.join("")} stroke={INK_DARK} strokeWidth="1.1" fill="none" strokeLinecap="round" />;
+}
+
+/* --- Yosemite, engraved: the Tunnel View — El Capitan, Bridalveil Fall,
+       Half Dome in the distance. --- */
+
+// El Capitan: a hard vertical prow — straight lines, no dome curves.
+const EL_CAP = "M0 320 L0 46 L58 38 L100 52 L118 74 L114 200 Q118 262 150 320 Z";
+const EL_CAP_SHADOW = "M84 46 L100 52 L118 74 L114 200 Q118 262 150 320 L96 320 L92 120 Z";
+// Half Dome: sheer face on the left, flattish crown, steep rounded back.
+const HALF_DOME = "M220 320 L220 242 L232 238 L232 134 Q236 118 254 114 Q284 112 294 128 Q301 140 303 162 L309 238 L320 320 Z";
+const HD_CROWN = "M232 134 Q236 118 254 114 Q284 112 294 128 L288 138 Q270 126 246 130 L236 140 Z";
+// Cathedral Rocks: stepped, angular terraces falling to the valley.
+const RIGHT_MASSIF = "M500 320 L500 50 L468 56 L452 86 L430 94 L410 126 L398 130 L384 176 L374 232 L368 320 Z";
+const FALL_X = 420;
+const MEADOW = "M0 320 L0 252 Q250 244 500 252 L500 320 Z";
+
+const YosemiteEngraved = () => (
+  <g>
+    {/* paper ground */}
+    <rect width="500" height="320" fill="#ffffff" />
+
+    {/* sun: open disc with double ring */}
+    <SkyLines yTop={26} yBottom={150} sunX={262} sunY={62} sunR={22} />
+    <circle cx={262} cy={62} r={22} fill="#fdfdfd" stroke={INK_DARK} strokeWidth="1.3" />
+    <circle cx={262} cy={62} r={27.5} fill="none" stroke={INK_MID} strokeWidth="0.6" opacity="0.7" />
+
+    {/* --- Half Dome, distant: kept light and airy for depth --- */}
+    <path d={HALF_DOME} fill="#f4f4f4" />
+    <Hatch id="yo-hd" region={HALF_DOME} angle={82} spacing={6.5} width={0.65} color={INK_MID} opacity={0.55} />
+    <path d={HD_CROWN} fill="#fbfbfb" opacity="0.9" />
+    {/* the sheer NW face reads as a hard vertical edge */}
+    <path d="M232 134 L232 238" stroke={INK_DARK} strokeWidth="1.4" opacity="0.8" />
+    <path d={HALF_DOME} fill="none" stroke={INK_DARK} strokeWidth="1" opacity="0.75" />
+
+    {/* --- El Capitan: near, bold, vertical-grain hatching --- */}
+    <path d={EL_CAP} fill="#e3e3e3" />
+    <Hatch id="yo-ec" region={EL_CAP} angle={90} spacing={3.8} width={0.95} />
+    <Hatch id="yo-ecs" region={EL_CAP_SHADOW} angle={24} spacing={7} width={0.8} opacity={0.8} />
+    <path d={EL_CAP} fill="none" stroke={INK_DARK} strokeWidth="2" />
+
+    {/* --- Cathedral Rocks: angular terraces with Bridalveil Fall --- */}
+    <path d={RIGHT_MASSIF} fill="#e6e6e6" />
+    <Hatch id="yo-rm" region={RIGHT_MASSIF} angle={-58} spacing={4.4} width={0.9} />
+    <Hatch id="yo-rms" region="M500 320 L500 50 L468 56 L452 86 L446 320 Z" angle={-90} spacing={8} width={0.7} opacity={0.7} />
+    {/* the fall: a strip of unprinted paper with fine thread lines */}
+    <path d={`M${FALL_X - 6} 132 L${FALL_X + 8} 130 L${FALL_X + 12} 236 L${FALL_X - 10} 236 Z`} fill="#ffffff" />
+    <path
+      d={`M${FALL_X - 3} 134 L${FALL_X - 6} 234 M${FALL_X + 1} 134 L${FALL_X + 1} 234 M${FALL_X + 5} 133 L${FALL_X + 8} 234`}
+      stroke={INK_MID}
+      strokeWidth="0.7"
+      opacity="0.7"
+      fill="none"
+    />
+    {/* splash at the base */}
+    <path
+      d={`M${FALL_X - 13} 238 Q${FALL_X} 231 ${FALL_X + 14} 238 M${FALL_X - 9} 243 Q${FALL_X + 1} 237 ${FALL_X + 10} 243`}
+      stroke={INK_MID}
+      strokeWidth="0.8"
+      fill="none"
+      opacity="0.8"
+    />
+    <path d={RIGHT_MASSIF} fill="none" stroke={INK_DARK} strokeWidth="1.8" />
+
+    {/* --- valley floor: ruled meadow, river, conifers --- */}
+    <Hatch id="yo-md" region={MEADOW} angle={0} spacing={5} width={0.8} color={INK_MID} opacity={0.75} />
+    {/* river glint: unprinted ribbon with wobble edges */}
+    <path d="M150 320 Q190 296 240 288 Q300 280 336 284" stroke="#ffffff" strokeWidth="13" fill="none" strokeLinecap="round" />
+    <path d="M150 314 Q192 292 240 284 Q298 276 334 280 M162 320 Q200 301 244 293 Q300 285 338 289" stroke={INK_DARK} strokeWidth="0.9" fill="none" />
+    {/* distant tree line */}
+    {[24, 44, 62, 196, 348, 372, 466, 484].map((x) => (
+      <EngravedTree key={`far-${x}`} x={x} y={262} h={13} />
+    ))}
+    {/* foreground trees */}
+    {[58, 92, 208, 254, 300, 398, 444].map((x, i) => (
+      <EngravedTree key={`near-${x}`} x={x} y={314} h={26 + ((i * 5) % 9)} />
+    ))}
+    {/* horizon rule */}
+    <path d="M0 252 Q250 244 500 252" stroke={INK_DARK} strokeWidth="1" fill="none" opacity="0.9" />
+  </g>
+);
+
 /* ---------------------------------------------------------------- scenes */
 
 function Conifers({ y, color, xs }: { y: number; color: string; xs: number[] }) {
@@ -221,6 +398,9 @@ function Conifers({ y, color, xs }: { y: number; color: string; xs: number[] }) 
   );
 }
 
+// Original flat-poster Yosemite, kept for reference while the engraved
+// direction is evaluated (see YosemiteEngraved above).
+// @ts-expect-error -- intentionally unused during the prototype
 const Yosemite = () => (
   <Frame colors={{ skyTop: "#f9c74f", skyBottom: "#f3722c", sun: "#fff3b0", sunRing: "#fff3b0" }} sunX={330} sunY={84}>
     {/* Half Dome */}
@@ -398,7 +578,7 @@ const Acadia = () => (
 );
 
 const SCENES: Record<string, () => JSX.Element> = {
-  yosemite: Yosemite,
+  yosemite: YosemiteEngraved,
   zion: Zion,
   "grand-canyon": GrandCanyon,
   yellowstone: Yellowstone,
