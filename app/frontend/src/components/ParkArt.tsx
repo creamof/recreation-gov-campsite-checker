@@ -270,30 +270,34 @@ function tuftPoints(cx: number, cy: number, rOuter = 16, rInner = 7, spikes = 9)
 /* ============================== SCENES ================================= */
 /* One monument per park, engraved in grayscale on white ground.           */
 
-/* --- YOSEMITE · Half Dome from the Valley --- */
+/* --- YOSEMITE · Half Dome from Ahwahnee Meadow ---
+   Silhouette digitized from the user's own photograph: the pinnacled
+   lower ridge, the sheer NW face with its water streaks, the visor,
+   the flat summit rolling off east, and the treed NE shoulder. --- */
 
 const HD_DOME =
-  "M190 80 Q212 60 252 60 Q312 62 346 104 Q384 152 399 216 Q408 252 414 282 L150 282 Q180 252 205 225 Z";
-const HD_FACE_BAND = "M190 80 L205 225 L228 219 L212 76 Z";
-const HD_APRON = "M205 225 L150 282 L262 282 Z";
+  "M0 214 L27 204 L54 195 L74 155 L83 145 L92 142 L104 132 L115 122 L126 107 L135 94 L143 83 L142 76 L147 71 L158 67 Q180 60 203 57 Q228 54 253 56 Q280 62 307 71 L329 83 L350 96 L365 111 L379 125 L388 136 L397 144 L413 135 L433 125 L455 124 L478 129 L500 128 L500 282 L0 282 Z";
+const HD_FACE_BAND =
+  "M147 71 L135 94 L115 122 L92 142 L74 155 L60 195 L66 282 L262 282 L250 180 L238 110 L228 58 Q196 56 158 67 Z";
+const HD_EAST_WALL = "M388 136 L500 128 L500 282 L340 282 Z";
 
 function FlankContours({ clipId }: { clipId: string }) {
-  const S = [198, 76], C1 = [288, 58], C2 = [366, 138], E = [406, 278];
-  const P = [214, 268];
+  const S = [240, 54], C1 = [310, 64], C2 = [362, 106], E = [394, 142];
+  const P = [252, 244];
   const L = (a: number[], t: number, i: number) => a[i] + (P[i] - a[i]) * t;
   const shells: JSX.Element[] = [];
-  for (let k = 0; k < 10; k++) {
-    const t = 0.07 + (k / 9) * 0.62;
+  for (let k = 0; k < 9; k++) {
+    const t = 0.08 + (k / 8) * 0.55;
     shells.push(
       <path
         key={k}
         d={`M ${L(S, t, 0)} ${L(S, t, 1)} C ${L(C1, t, 0)} ${L(C1, t, 1)}, ${L(C2, t, 0)} ${L(C2, t, 1)}, ${L(E, t, 0)} ${L(E, t, 1)}`}
-        strokeWidth={0.7 + (1 - t) * 0.35}
+        strokeWidth={0.7 + (1 - t) * 0.3}
       />
     );
   }
   return (
-    <g clipPath={`url(#${clipId})`} stroke={INK_DARK} fill="none" opacity="0.8">
+    <g clipPath={`url(#${clipId})`} stroke={INK_DARK} fill="none" opacity="0.75">
       {shells}
     </g>
   );
@@ -302,34 +306,45 @@ function FlankContours({ clipId }: { clipId: string }) {
 const Yosemite = () => (
   <g>
     <rect width="500" height="320" fill="#ffffff" />
-    <SkyLines yTop={26} yBottom={272} sunX={88} sunY={76} sunR={20} />
-    <Sun x={88} y={76} r={20} />
+    <SkyLines yTop={26} yBottom={200} sunX={58} sunY={64} sunR={16} />
+    <Sun x={58} y={64} r={16} />
 
+    {/* the massif */}
     <path d={HD_DOME} fill="#f2f2f2" />
     <clipPath id="yo-dome-clip">
       <path d={HD_DOME} />
     </clipPath>
     <FlankContours clipId="yo-dome-clip" />
 
-    <path d={HD_FACE_BAND} fill="#e6e6e6" />
-    <Hatch id="yo-face" region={HD_FACE_BAND} angle={94} spacing={3.4} width={0.9} />
-    <path d="M196 104 L203 210 M204 88 Q208 150 211 212" stroke={INK_DARK} strokeWidth="1" fill="none" opacity="0.7" />
-    <Hatch id="yo-apron" region={HD_APRON} angle={38} spacing={5.5} width={0.7} color={INK_MID} opacity={0.7} />
+    {/* the NW face: vertical grain + the famous dark water streaks */}
+    <path d={HD_FACE_BAND} fill="#eaeaea" />
+    <Hatch id="yo-face" region={HD_FACE_BAND} angle={92} spacing={3.6} width={0.85} opacity={0.9} />
+    <path d="M196 96 Q200 150 206 214 M214 84 Q220 150 228 234 M186 110 Q190 160 194 208 M234 92 Q240 160 246 240" stroke={INK_DARK} strokeWidth="1.3" fill="none" opacity="0.55" />
 
+    {/* east wall below the shoulder, sparser grain */}
+    <Hatch id="yo-east" region={HD_EAST_WALL} angle={88} spacing={5} width={0.7} color={INK_MID} opacity={0.65} />
+
+    {/* pinnacles on the lower ridge */}
+    <path d="M74 155 L78 146 L82 155 M85 150 L89 141 L93 150 M97 139 L101 131 L105 139" stroke={INK_DARK} strokeWidth="1.1" fill="none" />
+
+    {/* silhouette + the hard cut of the face edge (visor at the top) */}
     <path d={HD_DOME} fill="none" stroke={INK_DARK} strokeWidth="2" />
-    <path d="M190 80 L205 225 Q180 252 150 282" fill="none" stroke={INK_DARK} strokeWidth="2.2" />
+    <path d="M147 71 L135 94 L115 122 L92 142 L74 155" fill="none" stroke={INK_DARK} strokeWidth="2.2" />
+    {/* trees on the NE shoulder, tiny at that distance */}
+    <EngravedTree x={413} y={134} h={8} />
+    <EngravedTree x={433} y={124} h={8} />
+    <EngravedTree x={455} y={123} h={7} />
 
-    <path d="M136 128 Q142 122 148 128 M148 128 Q154 122 160 128 M124 152 Q129 147 134 152 M134 152 Q139 147 144 152" stroke={INK_MID} strokeWidth="1" fill="none" />
-
+    {/* meadow, big foreground pines overlapping the base — as in the photo */}
     <GroundBand yTop={282} id="yo-md" />
-    <path d="M40 320 Q110 300 190 296 Q290 292 350 298" stroke="#ffffff" strokeWidth="12" fill="none" strokeLinecap="round" />
-    <path d="M40 314 Q112 296 190 291 Q288 287 348 293 M52 320 Q120 305 196 301 Q292 297 352 303" stroke={INK_DARK} strokeWidth="0.85" fill="none" />
-    {[20, 62, 104, 240, 292, 386, 428, 470].map((x, i) => (
-      <EngravedTree key={x} x={x} y={318} h={24 + ((i * 7) % 11)} />
-    ))}
-    {[136, 176, 356, 494].map((x) => (
-      <EngravedTree key={`s-${x}`} x={x} y={300} h={14} />
-    ))}
+    <path d="M20 300 L20 293 M44 306 L44 299 M120 296 L120 289 M158 308 L158 301 M400 300 L400 293 M452 308 L452 301 M478 296 L478 290" stroke={INK_MID} strokeWidth="1.3" opacity="0.7" />
+    <EngravedTree x={238} y={320} h={44} />
+    <EngravedTree x={270} y={318} h={52} />
+    <EngravedTree x={302} y={320} h={40} />
+    <EngravedTree x={336} y={319} h={48} />
+    <EngravedTree x={92} y={314} h={26} />
+    <EngravedTree x={140} y={318} h={22} />
+    <EngravedTree x={452} y={316} h={28} />
   </g>
 );
 

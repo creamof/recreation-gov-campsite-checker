@@ -1,0 +1,3 @@
+yosemite.jpg
+  source:  the repository owner's own photograph (Ahwahnee Meadow, Yosemite Valley)
+  license: personal photo, all rights reserved by the owner
