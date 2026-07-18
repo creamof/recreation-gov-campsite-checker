@@ -13,3 +13,4 @@ app/frontend/dist/
 .DS_Store
 app/frontend/*.tsbuildinfo
 app/backend/data/
+.claude/worktrees/
