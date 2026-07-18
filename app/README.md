@@ -134,23 +134,53 @@ can **Add to Home Screen** to install it as an app.
 cd app/backend && source .venv/bin/activate && python -m pytest -q
 ```
 
-## Deploy notes
+## Deploying
 
-- Build the frontend with `npm run build` (outputs `app/frontend/dist/`) and
-  serve those static files from the same origin as the API so `/api/*` calls
-  resolve without CORS. Set `VITE_API_BASE` if you host the API elsewhere.
-- Recreation.gov has no official public reservation API; this uses the same
-  undocumented endpoints the website itself calls. Be a good citizen: cache
-  responses and don't hammer it. Booking rules and lottery dates are best-effort
-  and **change yearly** — the UI always links to recreation.gov to confirm.
+The one architectural constraint: the **cancellation watcher needs an
+always-on process** (its poller re-checks recreation.gov on an interval).
+That rules out purely serverless hosts — Vercel/Netlify functions sleep
+between requests, and the JSON persistence would vanish. Deploy the app as
+one small always-on service instead; the backend serves the built PWA
+itself, so a single container is the entire deployment.
 
-## Roadmap → Milestone 2 (alerts)
+### Option A — Render (recommended: closest to the Vercel experience)
 
-The PWA is already installable and its service worker has `push` /
-`notificationclick` handlers. To finish last-minute alerts:
+1. Push this repo to GitHub (already done if you're reading this there).
+2. In Render: **New → Blueprint**, select the repo. `render.yaml` does the
+   rest — Docker build, persistent disk at `/data`, health checks, HTTPS.
+3. Starter plan (~$7/mo) keeps the service always-on. The free tier works
+   for a demo but idles out, which stops the watcher.
 
-1. Add a `watches` store + `POST /api/watches` (facility + dates + push subscription).
-2. Add a scheduled poller that calls `recreation.count_available_sites(...)`
-   (already implemented) and sends a Web Push when a watched site opens up.
-3. Wire the frontend "Set a cancellation watch" CTA to register a
-   `PushSubscription` with VAPID keys.
+### Option B — Railway / Fly.io
+
+Both run `app/Dockerfile` directly. Add a volume mounted at `/data`, set
+`TRAILHEAD_DATA_DIR=/data`, done. Fly's smallest machine is effectively
+free; Railway is ~$5/mo.
+
+### Option C — any box you control (VPS, Raspberry Pi, home server)
+
+```bash
+docker build -f app/Dockerfile -t trailhead app
+docker run -d --restart unless-stopped -p 8000:8000 \
+  -v trailhead-data:/data trailhead
+```
+
+Put HTTPS in front (Caddy does it in two lines, or use Tailscale/Cloudflare
+Tunnel) — **HTTPS is required** for PWA install, notifications, and push.
+
+### Still want Vercel?
+
+Use it for the frontend only: deploy `app/frontend` (build command
+`npm run build`, output `dist`), set `VITE_API_BASE` to your backend URL,
+and host the backend on one of the options above. Two deploys instead of
+one — only worth it if you want Vercel's CDN for the static assets.
+
+### After deploying
+
+- Open the URL on your phone → **Add to Home Screen** to install the PWA.
+- For push that reaches you with the app closed: `npx web-push
+  generate-vapid-keys`, set the three `TRAILHEAD_VAPID_*` env vars, redeploy,
+  then hit **Enable notifications** in the Watches tab.
+- Optional: set `ANTHROPIC_API_KEY` to upgrade the concierge's language
+  parsing to Claude.
+- Be a good citizen: keep `TRAILHEAD_WATCH_INTERVAL` at 300+ seconds.

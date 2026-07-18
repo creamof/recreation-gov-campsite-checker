@@ -20,9 +20,12 @@ import contextlib
 import os
 from datetime import date
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import concierge
@@ -282,3 +285,16 @@ def api_availability(campground_id: str, arrival: date, departure: date) -> Avai
             online=False,
             note=f"Live availability unavailable from the server: {exc}",
         )
+
+
+# --------------------------------------------------------------------------- #
+# Static frontend (production single-service deploys)
+#
+# When the built PWA exists (app/frontend/dist, or FRONTEND_DIST), serve it
+# from this same process so one always-on service is the whole deployment.
+# Mounted last so every /api route above takes precedence.
+# --------------------------------------------------------------------------- #
+
+_dist = Path(os.environ.get("FRONTEND_DIST", Path(__file__).parent.parent / "frontend" / "dist"))
+if _dist.is_dir():
+    app.mount("/", StaticFiles(directory=_dist, html=True), name="frontend")

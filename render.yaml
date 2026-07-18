@@ -1,0 +1,38 @@
+# Render blueprint: deploy Trailhead as one always-on service.
+#
+# In the Render dashboard: New → Blueprint → point at this repo. Render reads
+# this file, builds app/Dockerfile, attaches a 1 GB disk for the watcher's
+# data, and gives you an HTTPS URL — which is required for PWA install,
+# notifications, and web push.
+#
+# NOTE: the cancellation watcher needs an always-on instance. Render's free
+# tier spins services down when idle (the poller would sleep with it), so use
+# the starter plan for real watching.
+
+services:
+  - type: web
+    name: trailhead
+    runtime: docker
+    plan: starter
+    dockerfilePath: app/Dockerfile
+    dockerContext: app
+    healthCheckPath: /api/health
+    disk:
+      name: trailhead-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: TRAILHEAD_DATA_DIR
+        value: /data
+      - key: TRAILHEAD_WATCH_INTERVAL
+        value: "300"
+      # Optional — uncomment and fill in to enable closed-app web push:
+      # - key: TRAILHEAD_VAPID_PUBLIC_KEY
+      #   sync: false
+      # - key: TRAILHEAD_VAPID_PRIVATE_KEY
+      #   sync: false
+      # - key: TRAILHEAD_VAPID_EMAIL
+      #   sync: false
+      # Optional — Claude-powered concierge parsing:
+      # - key: ANTHROPIC_API_KEY
+      #   sync: false
