@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { ConciergeResponse, TimelinePlan, TripOption } from "../types";
 import { askConcierge, preparePlan } from "../api";
 import ParkArt from "./ParkArt";
@@ -33,6 +33,11 @@ export default function Concierge({ onOpenPark }: { onOpenPark: (slug: string) =
   const [planFor, setPlanFor] = useState<string | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
+  const planRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (plan) planRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [plan]);
 
   async function ask(text?: string) {
     const q = (text ?? query).trim();
@@ -146,62 +151,63 @@ export default function Concierge({ onOpenPark }: { onOpenPark: (slug: string) =
               const key = `${opt.park_slug}:${opt.trip_title}`;
               const active = planFor === key;
               return (
-                <article key={key} className={`option-card card ${active ? "active" : ""}`}>
-                  <button className="option-art" onClick={() => onOpenPark(opt.park_slug)} title={`Open the ${opt.park_name} guide`}>
-                    <ParkArt slug={opt.park_slug} />
-                  </button>
-                  <div className="option-body">
-                    <div className="option-head">
-                      <div>
-                        <p className="eyebrow">{opt.park_name} · {opt.state}</p>
-                        <h3>{opt.trip_title}</h3>
-                      </div>
-                      <span className={`chip style-${opt.style}`}>{opt.style}</span>
-                    </div>
-                    <p className="muted">{opt.summary}</p>
-                    <ul className="why-list">
-                      {opt.why.map((w, i) => (
-                        <li key={i}>{w}</li>
-                      ))}
-                    </ul>
-                    <div className="timing-list">
-                      {opt.timing.map((t, i) => (
-                        <div key={i} className={`timing-item ${STATUS_META[t.status]?.cls ?? ""}`}>
-                          <span className="timing-status">{STATUS_META[t.status]?.label ?? t.status}</span>
-                          <div>
-                            <strong>{t.label}</strong>
-                            <p className="muted small">{t.detail}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      className="primary slim"
-                      onClick={() => buildPrep(opt)}
-                      disabled={planLoading}
-                      aria-busy={active && planLoading}
-                    >
-                      {active && planLoading ? "Building…" : "📅 Build my prep calendar"}
+                <Fragment key={key}>
+                  <article className={`option-card card ${active ? "active" : ""}`}>
+                    <button className="option-art" onClick={() => onOpenPark(opt.park_slug)} title={`Open the ${opt.park_name} guide`}>
+                      <ParkArt slug={opt.park_slug} />
                     </button>
-                    {active && planError && (
-                      <div className="error" role="alert">
-                        {planError}{" "}
-                        <button className="link" onClick={() => buildPrep(opt)}>
-                          Retry
-                        </button>
+                    <div className="option-body">
+                      <div className="option-head">
+                        <div>
+                          <p className="eyebrow">{opt.park_name} · {opt.state}</p>
+                          <h3>{opt.trip_title}</h3>
+                        </div>
+                        <span className={`chip style-${opt.style}`}>{opt.style}</span>
                       </div>
-                    )}
-                  </div>
-                </article>
+                      <p className="muted">{opt.summary}</p>
+                      <ul className="why-list">
+                        {opt.why.map((w, i) => (
+                          <li key={i}>{w}</li>
+                        ))}
+                      </ul>
+                      <div className="timing-list">
+                        {opt.timing.map((t, i) => (
+                          <div key={i} className={`timing-item ${STATUS_META[t.status]?.cls ?? ""}`}>
+                            <span className="timing-status">{STATUS_META[t.status]?.label ?? t.status}</span>
+                            <div>
+                              <strong>{t.label}</strong>
+                              <p className="muted small">{t.detail}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        className="primary slim"
+                        onClick={() => buildPrep(opt)}
+                        disabled={planLoading}
+                        aria-busy={active && planLoading}
+                      >
+                        {active && planLoading ? "Building…" : "📅 Build my prep calendar"}
+                      </button>
+                      {active && planError && (
+                        <div className="error" role="alert">
+                          {planError}{" "}
+                          <button className="link" onClick={() => buildPrep(opt)}>
+                            Retry
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                  {active && plan && (
+                    <div className="prep-plan" ref={planRef}>
+                      <TimelineView plan={plan} />
+                    </div>
+                  )}
+                </Fragment>
               );
             })}
           </div>
-
-          {plan && (
-            <div className="prep-plan">
-              <TimelineView plan={plan} />
-            </div>
-          )}
         </>
       )}
     </section>
