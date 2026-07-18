@@ -146,9 +146,9 @@ itself, so a single container is the entire deployment.
 ### Option A — Render (recommended: closest to the Vercel experience)
 
 1. In Render: **New → Blueprint**, select this repo.
-2. **Branch matters:** pick `claude/national-parks-campsite-planner-kc3ul9` —
-   the app doesn't exist on `master` yet (nothing's been merged there). Once
-   you do merge to `master`, redeploy from that branch instead.
+2. **Branch:** deploy from `master` — the whole app lives there. (If you have
+   an existing Render service still pointed at the old feature branch, flip
+   it to `master` under Settings → Build & Deploy → Branch.)
 3. Render reads `render.yaml` and shows you the plan. It's currently pinned
    to **free** (no card needed) so you can see the app live today. That
    means: no persistent disk (Render disks require a paid plan), so watch
