@@ -1,26 +1,33 @@
-# Render blueprint: deploy Trailhead as one always-on service.
+# Render blueprint: deploy Trailhead.
 #
 # In the Render dashboard: New → Blueprint → point at this repo. Render reads
-# this file, builds app/Dockerfile, attaches a 1 GB disk for the watcher's
-# data, and gives you an HTTPS URL — which is required for PWA install,
-# notifications, and web push.
+# this file, builds app/Dockerfile, and gives you an HTTPS URL — which is
+# required for PWA install, notifications, and web push.
 #
-# NOTE: the cancellation watcher needs an always-on instance. Render's free
-# tier spins services down when idle (the poller would sleep with it), so use
-# the starter plan for real watching.
+# Currently pinned to the FREE plan so you can see it live with no card on
+# file. Two things that means:
+#   1. No persistent disk (Render disks require a paid plan) — watch data
+#      lives in the container's ephemeral storage and resets on every
+#      restart/redeploy.
+#   2. Free services spin down after ~15 min idle, which pauses the
+#      cancellation watcher's background poller until the next request
+#      wakes it back up.
+# Both are fine for trying the app out. When you're ready to actually rely on
+# the watcher: change `plan: free` to `plan: starter` below and uncomment the
+# `disk:` block — that's the only change needed for always-on + persistence.
 
 services:
   - type: web
     name: trailhead
     runtime: docker
-    plan: starter
+    plan: free
     dockerfilePath: app/Dockerfile
     dockerContext: app
     healthCheckPath: /api/health
-    disk:
-      name: trailhead-data
-      mountPath: /data
-      sizeGB: 1
+    # disk:
+    #   name: trailhead-data
+    #   mountPath: /data
+    #   sizeGB: 1
     envVars:
       - key: TRAILHEAD_DATA_DIR
         value: /data

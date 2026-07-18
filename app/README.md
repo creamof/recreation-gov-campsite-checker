@@ -145,11 +145,22 @@ itself, so a single container is the entire deployment.
 
 ### Option A — Render (recommended: closest to the Vercel experience)
 
-1. Push this repo to GitHub (already done if you're reading this there).
-2. In Render: **New → Blueprint**, select the repo. `render.yaml` does the
-   rest — Docker build, persistent disk at `/data`, health checks, HTTPS.
-3. Starter plan (~$7/mo) keeps the service always-on. The free tier works
-   for a demo but idles out, which stops the watcher.
+1. In Render: **New → Blueprint**, select this repo.
+2. **Branch matters:** pick `claude/national-parks-campsite-planner-kc3ul9` —
+   the app doesn't exist on `master` yet (nothing's been merged there). Once
+   you do merge to `master`, redeploy from that branch instead.
+3. Render reads `render.yaml` and shows you the plan. It's currently pinned
+   to **free** (no card needed) so you can see the app live today. That
+   means: no persistent disk (Render disks require a paid plan), so watch
+   data resets on every restart/redeploy, and the service sleeps after ~15
+   min idle, which pauses the cancellation watcher's poller until the next
+   request wakes it. Fine for trying it out; not for relying on the watcher.
+4. Click **Apply**. First build takes a few minutes (Docker build + npm
+   install). You'll get an `onrender.com` HTTPS URL when it's done.
+5. **When you're ready to actually use the watcher:** in `render.yaml`,
+   change `plan: free` to `plan: starter` (~$7/mo) and uncomment the `disk:`
+   block, push, and Render redeploys with always-on + persistence. That's
+   the only change needed.
 
 ### Option B — Railway / Fly.io
 
