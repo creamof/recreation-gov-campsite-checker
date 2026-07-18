@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ParkGuide, PlanTarget, SearchResult, TimelinePlan, Trip } from "./types";
 import { getTimeline } from "./api";
+import { loadPersisted, savePersisted } from "./lib/persistedState";
 import SearchPanel from "./components/SearchPanel";
 import TripForm from "./components/TripForm";
 import TimelineView from "./components/TimelineView";
@@ -12,15 +13,70 @@ import WatchPanel from "./components/WatchPanel";
 
 type Tab = "ideas" | "explore" | "plan" | "watches" | "lotteries";
 
+type ManualPrefill = { name: string; park: string; type: string } | null;
+
+interface PersistedPlannerState {
+  tab: Tab;
+  openPark: string | null;
+  target: SearchResult | null;
+  manualPrefill: ManualPrefill;
+  plan: TimelinePlan | null;
+  arrival: string | null;
+  departure: string | null;
+}
+
+const PLANNER_STATE_KEY = "trailhead.plannerState.v1";
+
+const DEFAULT_PLANNER_STATE: PersistedPlannerState = {
+  tab: "ideas",
+  openPark: null,
+  target: null,
+  manualPrefill: null,
+  plan: null,
+  arrival: null,
+  departure: null,
+};
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
+/** Load the persisted snapshot, dropping a stale plan/dates whose arrival has already passed. */
+function loadInitialPlannerState(): PersistedPlannerState {
+  const stored = loadPersisted<Partial<PersistedPlannerState>>(PLANNER_STATE_KEY, {});
+  const state: PersistedPlannerState = { ...DEFAULT_PLANNER_STATE, ...stored };
+  if (state.arrival && state.arrival < todayISO()) {
+    // The restored trip already happened — keep the target so the user only
+    // has to re-pick dates, but don't show a booking timeline for the past.
+    state.plan = null;
+    state.arrival = null;
+    state.departure = null;
+  }
+  return state;
+}
+
 export default function App() {
-  const [tab, setTab] = useState<Tab>("ideas");
-  const [openPark, setOpenPark] = useState<string | null>(null);
-  const [target, setTarget] = useState<SearchResult | null>(null);
+  const [initial] = useState(loadInitialPlannerState);
+  const [tab, setTab] = useState<Tab>(initial.tab);
+  const [openPark, setOpenPark] = useState<string | null>(initial.openPark);
+  const [target, setTarget] = useState<SearchResult | null>(initial.target);
   const [defaultNights, setDefaultNights] = useState<number>(3);
-  const [manualPrefill, setManualPrefill] = useState<{ name: string; park: string; type: string } | null>(null);
-  const [plan, setPlan] = useState<TimelinePlan | null>(null);
+  const [manualPrefill, setManualPrefill] = useState<ManualPrefill>(initial.manualPrefill);
+  const [plan, setPlan] = useState<TimelinePlan | null>(initial.plan);
+  const [arrival, setArrival] = useState<string | null>(initial.arrival);
+  const [departure, setDeparture] = useState<string | null>(initial.departure);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    savePersisted<PersistedPlannerState>(PLANNER_STATE_KEY, {
+      tab,
+      openPark,
+      target,
+      manualPrefill,
+      plan,
+      arrival,
+      departure,
+    });
+  }, [tab, openPark, target, manualPrefill, plan, arrival, departure]);
 
   /** A suggested trip's facility → hand off to the planner. */
   function planFromGuide(t: PlanTarget, park: ParkGuide, trip: Trip) {
@@ -73,6 +129,19 @@ export default function App() {
     setPlan(null);
     setError(null);
     setManualPrefill(null);
+    setArrival(null);
+    setDeparture(null);
+    // Write the cleared snapshot immediately rather than waiting on the
+    // persistence effect, so declining a plan can't leave stale data behind.
+    savePersisted<PersistedPlannerState>(PLANNER_STATE_KEY, {
+      tab,
+      openPark,
+      target: null,
+      manualPrefill: null,
+      plan: null,
+      arrival: null,
+      departure: null,
+    });
   }
 
   return (
@@ -150,7 +219,17 @@ export default function App() {
                   </button>
                 </div>
 
-                <TripForm loading={loading} onBuild={buildTimeline} defaultNights={defaultNights} />
+                <TripForm
+                  loading={loading}
+                  onBuild={buildTimeline}
+                  defaultNights={defaultNights}
+                  initialArrival={arrival}
+                  initialDeparture={departure}
+                  onDatesChange={(a, d) => {
+                    setArrival(a);
+                    setDeparture(d);
+                  }}
+                />
                 {error && <div className="error">{error}</div>}
                 {plan && <TimelineView plan={plan} />}
               </div>

@@ -1,8 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface Props {
   loading: boolean;
   defaultNights?: number;
+  /** Restored dates from a persisted session — repopulate instead of the default +30-day window. */
+  initialArrival?: string | null;
+  initialDeparture?: string | null;
+  /** Fired whenever arrival/departure change, so a caller can persist them. */
+  onDatesChange?: (arrival: string, departure: string) => void;
   onBuild: (input: {
     arrival: string;
     departure: string;
@@ -18,11 +23,23 @@ function addDays(iso: string, days: number): string {
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-export default function TripForm({ loading, onBuild, defaultNights = 3 }: Props) {
+export default function TripForm({
+  loading,
+  onBuild,
+  defaultNights = 3,
+  initialArrival,
+  initialDeparture,
+  onDatesChange,
+}: Props) {
   const defaultArrival = useMemo(() => addDays(todayISO(), 30), []);
-  const [arrival, setArrival] = useState(defaultArrival);
-  const [departure, setDeparture] = useState(addDays(defaultArrival, defaultNights));
+  const [arrival, setArrival] = useState(initialArrival || defaultArrival);
+  const [departure, setDeparture] = useState(initialDeparture || addDays(arrival, defaultNights));
   const [strategy, setStrategy] = useState<"" | "campground" | "lottery">("");
+
+  useEffect(() => {
+    onDatesChange?.(arrival, departure);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arrival, departure]);
 
   const invalid = departure <= arrival;
   const nights = Math.max(
