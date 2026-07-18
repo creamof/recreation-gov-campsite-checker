@@ -32,6 +32,7 @@ export default function Concierge({ onOpenPark }: { onOpenPark: (slug: string) =
   const [plan, setPlan] = useState<TimelinePlan | null>(null);
   const [planFor, setPlanFor] = useState<string | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
 
   async function ask(text?: string) {
     const q = (text ?? query).trim();
@@ -53,7 +54,8 @@ export default function Concierge({ onOpenPark }: { onOpenPark: (slug: string) =
   async function buildPrep(opt: TripOption) {
     setPlanLoading(true);
     setPlanFor(`${opt.park_slug}:${opt.trip_title}`);
-    setError(null);
+    setPlanError(null);
+    setPlan(null);
     try {
       const monthNum = result ? new Date(result.arrival + "T00:00:00").getMonth() + 1 : month || undefined;
       const yearNum = result ? new Date(result.arrival + "T00:00:00").getFullYear() : undefined;
@@ -66,8 +68,14 @@ export default function Concierge({ onOpenPark }: { onOpenPark: (slug: string) =
         })
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not build the prep calendar.");
-      setPlanFor(null);
+      // A bare "Failed to fetch" almost always means the server never
+      // answered — the most common cause on a free-tier host is that the
+      // instance was asleep and is still waking up.
+      const raw = e instanceof Error ? e.message : "Could not build the prep calendar.";
+      const hint = /failed to fetch|networkerror|load failed/i.test(raw)
+        ? "Couldn't reach the server. If this app was just deployed (or has been idle a while) it may still be waking up — wait a few seconds and try again."
+        : raw;
+      setPlanError(hint);
     } finally {
       setPlanLoading(false);
     }
@@ -167,9 +175,22 @@ export default function Concierge({ onOpenPark }: { onOpenPark: (slug: string) =
                         </div>
                       ))}
                     </div>
-                    <button className="primary slim" onClick={() => buildPrep(opt)} disabled={planLoading}>
+                    <button
+                      className="primary slim"
+                      onClick={() => buildPrep(opt)}
+                      disabled={planLoading}
+                      aria-busy={active && planLoading}
+                    >
                       {active && planLoading ? "Building…" : "📅 Build my prep calendar"}
                     </button>
+                    {active && planError && (
+                      <div className="error" role="alert">
+                        {planError}{" "}
+                        <button className="link" onClick={() => buildPrep(opt)}>
+                          Retry
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </article>
               );
