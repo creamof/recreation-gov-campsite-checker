@@ -301,82 +301,85 @@ function EngravedTree({ x, y, h }: { x: number; y: number; h: number }) {
   return <path d={parts.join("")} stroke={INK_DARK} strokeWidth="1.1" fill="none" strokeLinecap="round" />;
 }
 
-/* --- Yosemite, engraved: the Tunnel View — El Capitan, Bridalveil Fall,
-       Half Dome in the distance. --- */
+/* --- Yosemite, engraved: Half Dome as the single monument. From the
+       Valley: the sheer NW face on the left, summit right at its lip, and
+       the great convex back bulging away to the right — modeled with
+       contour lines that run parallel to the back, the engraver's way. --- */
 
-// El Capitan: a hard vertical prow — straight lines, no dome curves.
-const EL_CAP = "M0 320 L0 46 L58 38 L100 52 L118 74 L114 200 Q118 262 150 320 Z";
-const EL_CAP_SHADOW = "M84 46 L100 52 L118 74 L114 200 Q118 262 150 320 L96 320 L92 120 Z";
-// Half Dome: sheer face on the left, flattish crown, steep rounded back.
-const HALF_DOME = "M220 320 L220 242 L232 238 L232 134 Q236 118 254 114 Q284 112 294 128 Q301 140 303 162 L309 238 L320 320 Z";
-const HD_CROWN = "M232 134 Q236 118 254 114 Q284 112 294 128 L288 138 Q270 126 246 130 L236 140 Z";
-// Cathedral Rocks: stepped, angular terraces falling to the valley.
-const RIGHT_MASSIF = "M500 320 L500 50 L468 56 L452 86 L430 94 L410 126 L398 130 L384 176 L374 232 L368 320 Z";
-const FALL_X = 420;
-const MEADOW = "M0 320 L0 252 Q250 244 500 252 L500 320 Z";
+const HD_DOME =
+  "M190 80 Q212 60 252 60 Q312 62 346 104 Q384 152 399 216 Q408 252 414 282 L150 282 Q180 252 205 225 Z";
+const HD_FACE_BAND = "M190 80 L205 225 L228 219 L212 76 Z";
+const HD_APRON = "M205 225 L150 282 L262 282 Z";
+const HD_MEADOW = "M0 320 L0 282 L500 282 L500 320 Z";
+
+/** Nested cubics interpolated between the back silhouette and the face
+ *  base — contour shells that follow the dome's flank. */
+function FlankContours({ clipId }: { clipId: string }) {
+  // Outer curve ≈ the back edge; inner focal point at the base of the face.
+  const S = [198, 76], C1 = [288, 58], C2 = [366, 138], E = [406, 278];
+  const P = [214, 268];
+  const L = (a: number[], t: number, i: number) => a[i] + (P[i] - a[i]) * t;
+  const shells: JSX.Element[] = [];
+  for (let k = 0; k < 10; k++) {
+    const t = 0.07 + (k / 9) * 0.62;
+    shells.push(
+      <path
+        key={k}
+        d={`M ${L(S, t, 0)} ${L(S, t, 1)} C ${L(C1, t, 0)} ${L(C1, t, 1)}, ${L(C2, t, 0)} ${L(C2, t, 1)}, ${L(E, t, 0)} ${L(E, t, 1)}`}
+        strokeWidth={0.7 + (1 - t) * 0.35}
+      />
+    );
+  }
+  return (
+    <g clipPath={`url(#${clipId})`} stroke={INK_DARK} fill="none" opacity="0.8">
+      {shells}
+    </g>
+  );
+}
 
 const YosemiteEngraved = () => (
   <g>
     {/* paper ground */}
     <rect width="500" height="320" fill="#ffffff" />
 
-    {/* sun: open disc with double ring */}
-    <SkyLines yTop={26} yBottom={150} sunX={262} sunY={62} sunR={22} />
-    <circle cx={262} cy={62} r={22} fill="#fdfdfd" stroke={INK_DARK} strokeWidth="1.3" />
-    <circle cx={262} cy={62} r={27.5} fill="none" stroke={INK_MID} strokeWidth="0.6" opacity="0.7" />
+    {/* ruled sky with sun upper-left, clear of the monument */}
+    <SkyLines yTop={26} yBottom={272} sunX={88} sunY={76} sunR={20} />
+    <circle cx={88} cy={76} r={20} fill="#fdfdfd" stroke={INK_DARK} strokeWidth="1.3" />
+    <circle cx={88} cy={76} r={25} fill="none" stroke={INK_MID} strokeWidth="0.6" opacity="0.7" />
 
-    {/* --- Half Dome, distant: kept light and airy for depth --- */}
-    <path d={HALF_DOME} fill="#f4f4f4" />
-    <Hatch id="yo-hd" region={HALF_DOME} angle={82} spacing={6.5} width={0.65} color={INK_MID} opacity={0.55} />
-    <path d={HD_CROWN} fill="#fbfbfb" opacity="0.9" />
-    {/* the sheer NW face reads as a hard vertical edge */}
-    <path d="M232 134 L232 238" stroke={INK_DARK} strokeWidth="1.4" opacity="0.8" />
-    <path d={HALF_DOME} fill="none" stroke={INK_DARK} strokeWidth="1" opacity="0.75" />
+    {/* --- the dome mass with flank contours --- */}
+    <path d={HD_DOME} fill="#f2f2f2" />
+    <clipPath id="yo-dome-clip">
+      <path d={HD_DOME} />
+    </clipPath>
+    <FlankContours clipId="yo-dome-clip" />
 
-    {/* --- El Capitan: near, bold, vertical-grain hatching --- */}
-    <path d={EL_CAP} fill="#e3e3e3" />
-    <Hatch id="yo-ec" region={EL_CAP} angle={90} spacing={3.8} width={0.95} />
-    <Hatch id="yo-ecs" region={EL_CAP_SHADOW} angle={24} spacing={7} width={0.8} opacity={0.8} />
-    <path d={EL_CAP} fill="none" stroke={INK_DARK} strokeWidth="2" />
+    {/* --- the sheer face: vertical grain --- */}
+    <path d={HD_FACE_BAND} fill="#e6e6e6" />
+    <Hatch id="yo-face" region={HD_FACE_BAND} angle={94} spacing={3.4} width={0.9} />
+    <path d="M196 104 L203 210 M204 88 Q208 150 211 212" stroke={INK_DARK} strokeWidth="1" fill="none" opacity="0.7" />
+    {/* slabby apron at the base of the face */}
+    <Hatch id="yo-apron" region={HD_APRON} angle={38} spacing={5.5} width={0.7} color={INK_MID} opacity={0.7} />
 
-    {/* --- Cathedral Rocks: angular terraces with Bridalveil Fall --- */}
-    <path d={RIGHT_MASSIF} fill="#e6e6e6" />
-    <Hatch id="yo-rm" region={RIGHT_MASSIF} angle={-58} spacing={4.4} width={0.9} />
-    <Hatch id="yo-rms" region="M500 320 L500 50 L468 56 L452 86 L446 320 Z" angle={-90} spacing={8} width={0.7} opacity={0.7} />
-    {/* the fall: a strip of unprinted paper with fine thread lines */}
-    <path d={`M${FALL_X - 6} 132 L${FALL_X + 8} 130 L${FALL_X + 12} 236 L${FALL_X - 10} 236 Z`} fill="#ffffff" />
-    <path
-      d={`M${FALL_X - 3} 134 L${FALL_X - 6} 234 M${FALL_X + 1} 134 L${FALL_X + 1} 234 M${FALL_X + 5} 133 L${FALL_X + 8} 234`}
-      stroke={INK_MID}
-      strokeWidth="0.7"
-      opacity="0.7"
-      fill="none"
-    />
-    {/* splash at the base */}
-    <path
-      d={`M${FALL_X - 13} 238 Q${FALL_X} 231 ${FALL_X + 14} 238 M${FALL_X - 9} 243 Q${FALL_X + 1} 237 ${FALL_X + 10} 243`}
-      stroke={INK_MID}
-      strokeWidth="0.8"
-      fill="none"
-      opacity="0.8"
-    />
-    <path d={RIGHT_MASSIF} fill="none" stroke={INK_DARK} strokeWidth="1.8" />
+    {/* silhouette + the hard cut of the face */}
+    <path d={HD_DOME} fill="none" stroke={INK_DARK} strokeWidth="2" />
+    <path d="M190 80 L205 225 Q180 252 150 282" fill="none" stroke={INK_DARK} strokeWidth="2.2" />
 
-    {/* --- valley floor: ruled meadow, river, conifers --- */}
-    <Hatch id="yo-md" region={MEADOW} angle={0} spacing={5} width={0.8} color={INK_MID} opacity={0.75} />
-    {/* river glint: unprinted ribbon with wobble edges */}
-    <path d="M150 320 Q190 296 240 288 Q300 280 336 284" stroke="#ffffff" strokeWidth="13" fill="none" strokeLinecap="round" />
-    <path d="M150 314 Q192 292 240 284 Q298 276 334 280 M162 320 Q200 301 244 293 Q300 285 338 289" stroke={INK_DARK} strokeWidth="0.9" fill="none" />
-    {/* distant tree line */}
-    {[24, 44, 62, 196, 348, 372, 466, 484].map((x) => (
-      <EngravedTree key={`far-${x}`} x={x} y={262} h={13} />
+    {/* gulls for scale against the face */}
+    <path d="M136 128 Q142 122 148 128 M148 128 Q154 122 160 128 M124 152 Q129 147 134 152 M134 152 Q139 147 144 152" stroke={INK_MID} strokeWidth="1" fill="none" />
+
+    {/* --- valley floor: ruled meadow, the Merced, tree line --- */}
+    <Hatch id="yo-md" region={HD_MEADOW} angle={0} spacing={5} width={0.75} color={INK_MID} opacity={0.7} />
+    <path d="M40 320 Q110 300 190 296 Q290 292 350 298" stroke="#ffffff" strokeWidth="12" fill="none" strokeLinecap="round" />
+    <path d="M40 314 Q112 296 190 291 Q288 287 348 293 M52 320 Q120 305 196 301 Q292 297 352 303" stroke={INK_DARK} strokeWidth="0.85" fill="none" />
+    {[20, 62, 104, 240, 292, 386, 428, 470].map((x, i) => (
+      <EngravedTree key={x} x={x} y={318} h={24 + ((i * 7) % 11)} />
     ))}
-    {/* foreground trees */}
-    {[58, 92, 208, 254, 300, 398, 444].map((x, i) => (
-      <EngravedTree key={`near-${x}`} x={x} y={314} h={26 + ((i * 5) % 9)} />
+    {[136, 176, 356, 494].map((x) => (
+      <EngravedTree key={`s-${x}`} x={x} y={300} h={14} />
     ))}
     {/* horizon rule */}
-    <path d="M0 252 Q250 244 500 252" stroke={INK_DARK} strokeWidth="1" fill="none" opacity="0.9" />
+    <path d="M0 282 L500 282" stroke={INK_DARK} strokeWidth="1" opacity="0.9" />
   </g>
 );
 
