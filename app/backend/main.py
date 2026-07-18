@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 import recreation
 from lotteries import all_lotteries
+from parks import all_parks, get_park
 from schemas import SearchResult, TimelinePlan, TimelineRequest
 from timeline import build_timeline
 
@@ -85,6 +86,21 @@ def api_search(q: str, size: int = 15) -> SearchResponse:
                 f"ID manually. ({exc})"
             ),
         )
+
+
+@app.get("/api/parks")
+def api_parks() -> dict:
+    """Summaries for the Explore grid."""
+    return {"parks": all_parks()}
+
+
+@app.get("/api/parks/{slug}")
+def api_park(slug: str) -> dict:
+    """Full curated guide for one park: trips, activities, eats, amenities."""
+    park = get_park(slug)
+    if park is None:
+        raise HTTPException(status_code=404, detail=f"Unknown park: {slug}")
+    return park
 
 
 @app.get("/api/lotteries")

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 interface Props {
   loading: boolean;
+  defaultNights?: number;
   onBuild: (input: {
     arrival: string;
     departure: string;
@@ -17,10 +18,10 @@ function addDays(iso: string, days: number): string {
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-export default function TripForm({ loading, onBuild }: Props) {
+export default function TripForm({ loading, onBuild, defaultNights = 3 }: Props) {
   const defaultArrival = useMemo(() => addDays(todayISO(), 30), []);
   const [arrival, setArrival] = useState(defaultArrival);
-  const [departure, setDeparture] = useState(addDays(defaultArrival, 3));
+  const [departure, setDeparture] = useState(addDays(defaultArrival, defaultNights));
   const [strategy, setStrategy] = useState<"" | "campground" | "lottery">("");
 
   const invalid = departure <= arrival;

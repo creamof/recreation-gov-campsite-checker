@@ -6,12 +6,13 @@ campground and backcountry-permit trips on [recreation.gov](https://www.recreati
 It grows out of the CLI availability checker in the repo root and adds a real
 planning brain on top of the same recreation.gov APIs.
 
-## Two planned capabilities
+## Capabilities
 
 | # | Capability | Status |
 |---|------------|--------|
 | 1 | **Booking timeline planner** — pick a campground or permit + your dates, and get an exact timeline: when the reservation window opens, when a lottery closes, and what to do on each date so you don't miss it. | ✅ **Milestone 1 — built** |
-| 2 | **Last-minute availability alerts** — watch specific campgrounds/dates and get a web-push notification the moment a cancellation frees a site. | 🔜 Milestone 2 — foundation in place (installable PWA + service-worker push handlers already wired) |
+| 2 | **Explore parks field guide** — eight flagship parks, each with hand-drawn poster artwork, curated trip suggestions wired into the planner, things to do beyond the campsite, places to eat, and camp logistics (showers, laundry, resupply, connectivity). | ✅ **Milestone 1.5 — built** |
+| 3 | **Last-minute availability alerts** — watch specific campgrounds/dates and get a web-push notification the moment a cancellation frees a site. | 🔜 Milestone 2 — foundation in place (installable PWA + service-worker push handlers already wired) |
 
 ## Why a timeline, not just a search
 
@@ -33,17 +34,26 @@ The planner encodes these rules and turns them into a dated, actionable plan.
 ```
 app/
 ├── backend/                 FastAPI service (reuses the repo's recreation.gov API knowledge)
-│   ├── main.py              API routes: /search, /timeline, /lotteries, /availability
+│   ├── main.py              API routes: /search, /timeline, /lotteries, /parks, /availability
 │   ├── recreation.py        recreation.gov client (search + metadata + availability)
 │   ├── booking_rules.py     rolling-window rules engine (+ Yosemite override)
 │   ├── lotteries.py         seed data for well-known backcountry lotteries
+│   ├── parks.py             curated field guide: trips, activities, eats, amenities
 │   ├── timeline.py          the planning brain — pure, unit-tested, works offline
 │   ├── schemas.py           pydantic models
-│   └── tests/               13 unit tests for the timeline engine
+│   └── tests/               19 unit tests (timeline engine + parks guide)
 └── frontend/                React + TypeScript PWA (Vite)
-    ├── src/                 search → dates → timeline UI; lottery browser
-    └── public/              manifest + service worker (installable; push-ready)
+    ├── src/components/ParkArt.tsx    hand-drawn WPA-poster SVG art per park
+    ├── src/components/Park*.tsx      explore grid + park guide pages
+    ├── src/                          search → dates → timeline UI; lottery browser
+    └── public/                       manifest + service worker (installable; push-ready)
 ```
+
+Guide data (trips/eats/showers/laundry) is curated seed content in `parks.py` —
+editorial, offline-friendly, and always linked back to official sources since
+hours and policies drift. Facility IDs are only hard-coded where confident;
+otherwise the planner opens pre-filled and the user completes the ID from the
+recreation.gov URL.
 
 The **timeline engine is a pure function** of its inputs — no network — so it
 works even when recreation.gov is unreachable, and the search endpoint degrades

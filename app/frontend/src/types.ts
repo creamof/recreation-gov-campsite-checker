@@ -61,3 +61,62 @@ export interface LotteryResponse {
   year: number;
   lotteries: Lottery[];
 }
+
+/* ---- Parks guide ---- */
+
+export interface ParkSummary {
+  slug: string;
+  name: string;
+  state: string;
+  established: string;
+  tagline: string;
+  trip_count: number;
+}
+
+export interface PlanTarget {
+  name: string;
+  entity_type: string;
+  rec_gov_id: string | null;
+  note: string;
+}
+
+export interface Trip {
+  title: string;
+  style: string;
+  nights: number;
+  best_months: string;
+  summary: string;
+  itinerary: string[];
+  targets: PlanTarget[];
+}
+
+export interface ParkActivity {
+  name: string;
+  kind: string;
+  detail: string;
+}
+
+export interface Eat {
+  name: string;
+  where: string;
+  detail: string;
+}
+
+export interface ParkAmenities {
+  showers: string[];
+  laundry: string[];
+  groceries: string[];
+  connectivity: string;
+  heads_up: string;
+}
+
+export interface ParkGuide extends Omit<ParkSummary, "trip_count"> {
+  description: string;
+  best_seasons: string;
+  crowd_tip: string;
+  official_url: string;
+  trips: Trip[];
+  activities: ParkActivity[];
+  eats: Eat[];
+  amenities: ParkAmenities;
+}

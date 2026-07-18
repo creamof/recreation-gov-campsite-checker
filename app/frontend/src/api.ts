@@ -1,4 +1,4 @@
-import type { LotteryResponse, SearchResponse, TimelinePlan } from "./types";
+import type { LotteryResponse, ParkGuide, ParkSummary, SearchResponse, TimelinePlan } from "./types";
 
 // Empty base -> same origin (prod, or dev via Vite's /api proxy).
 const BASE = import.meta.env.VITE_API_BASE ?? "";
@@ -36,4 +36,14 @@ export async function getTimeline(body: {
 export async function getLotteries(year: number): Promise<LotteryResponse> {
   const res = await fetch(`${BASE}/api/lotteries?year=${year}`);
   return json<LotteryResponse>(res);
+}
+
+export async function getParks(): Promise<{ parks: ParkSummary[] }> {
+  const res = await fetch(`${BASE}/api/parks`);
+  return json<{ parks: ParkSummary[] }>(res);
+}
+
+export async function getPark(slug: string): Promise<ParkGuide> {
+  const res = await fetch(`${BASE}/api/parks/${slug}`);
+  return json<ParkGuide>(res);
 }

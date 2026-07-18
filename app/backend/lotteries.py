@@ -165,6 +165,33 @@ LOTTERIES: tuple[PermitLottery, ...] = (
         ),
     ),
     PermitLottery(
+        slug="angels-landing",
+        name="Angels Landing",
+        park="Zion National Park",
+        verify_url="https://www.nps.gov/zion/planyourvisit/angels-landing-hiking-permits.htm",
+        match_names=("angels landing",),
+        summary="Quarterly seasonal lotteries plus a day-before lottery for the chained ridge.",
+        phases=(
+            LotteryPhase(
+                name="Seasonal lottery (example: summer window)",
+                kind="lottery",
+                opens=(4, 1),
+                closes=(4, 20),
+                results=(4, 25),
+                notes="Four seasonal windows a year (Jan/Apr/Jul/Oct pattern) each covering the following season — apply in the window before your trip season.",
+            ),
+            LotteryPhase(
+                name="Day-before lottery",
+                kind="lottery",
+                opens=(1, 1),
+                closes=(12, 31),
+                results=None,
+                rolling=True,
+                notes="Enter between 12:01 AM and 3 PM MT the day before your hike; results that evening.",
+            ),
+        ),
+    ),
+    PermitLottery(
         slug="mount-st-helens",
         name="Mount St. Helens (Monitor Ridge)",
         park="Mount St. Helens National Volcanic Monument",

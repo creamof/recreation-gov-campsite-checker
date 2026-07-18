@@ -2,12 +2,24 @@ import { useEffect, useRef, useState } from "react";
 import type { SearchResult } from "../types";
 import { search } from "../api";
 
-export default function SearchPanel({ onSelect }: { onSelect: (r: SearchResult) => void }) {
+export interface ManualPrefill {
+  name: string;
+  park: string;
+  type: string;
+}
+
+export default function SearchPanel({
+  onSelect,
+  prefill = null,
+}: {
+  onSelect: (r: SearchResult) => void;
+  prefill?: ManualPrefill | null;
+}) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  const [showManual, setShowManual] = useState(false);
+  const [showManual, setShowManual] = useState(prefill != null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -78,16 +90,22 @@ export default function SearchPanel({ onSelect }: { onSelect: (r: SearchResult) 
         </button>
       </div>
 
-      {showManual && <ManualEntry onSelect={onSelect} />}
+      {showManual && <ManualEntry onSelect={onSelect} prefill={prefill} />}
     </section>
   );
 }
 
-function ManualEntry({ onSelect }: { onSelect: (r: SearchResult) => void }) {
-  const [name, setName] = useState("");
+function ManualEntry({
+  onSelect,
+  prefill,
+}: {
+  onSelect: (r: SearchResult) => void;
+  prefill?: ManualPrefill | null;
+}) {
+  const [name, setName] = useState(prefill?.name ?? "");
   const [id, setId] = useState("");
-  const [type, setType] = useState("campground");
-  const [park, setPark] = useState("");
+  const [type, setType] = useState(prefill?.type ?? "campground");
+  const [park, setPark] = useState(prefill?.park ?? "");
 
   return (
     <div className="manual card">

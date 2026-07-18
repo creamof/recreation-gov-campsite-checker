@@ -1,19 +1,46 @@
 import { useState } from "react";
-import type { SearchResult, TimelinePlan } from "./types";
+import type { ParkGuide, PlanTarget, SearchResult, TimelinePlan, Trip } from "./types";
 import { getTimeline } from "./api";
 import SearchPanel from "./components/SearchPanel";
 import TripForm from "./components/TripForm";
 import TimelineView from "./components/TimelineView";
 import LotteryExplorer from "./components/LotteryExplorer";
+import ParkExplorer from "./components/ParkExplorer";
+import ParkDetail from "./components/ParkDetail";
 
-type Tab = "plan" | "lotteries";
+type Tab = "explore" | "plan" | "lotteries";
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>("plan");
+  const [tab, setTab] = useState<Tab>("explore");
+  const [openPark, setOpenPark] = useState<string | null>(null);
   const [target, setTarget] = useState<SearchResult | null>(null);
+  const [defaultNights, setDefaultNights] = useState<number>(3);
+  const [manualPrefill, setManualPrefill] = useState<{ name: string; park: string; type: string } | null>(null);
   const [plan, setPlan] = useState<TimelinePlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /** A suggested trip's facility → hand off to the planner. */
+  function planFromGuide(t: PlanTarget, park: ParkGuide, trip: Trip) {
+    setPlan(null);
+    setError(null);
+    setDefaultNights(trip.nights);
+    if (t.rec_gov_id) {
+      setTarget({
+        id: t.rec_gov_id,
+        name: t.name,
+        entity_type: t.entity_type,
+        parent_name: `${park.name} National Park`,
+      });
+      setManualPrefill(null);
+    } else {
+      // No confirmed ID — open the planner with the name pre-filled so the
+      // user completes it via search or the recreation.gov URL.
+      setTarget(null);
+      setManualPrefill({ name: t.name, park: `${park.name} National Park`, type: t.entity_type });
+    }
+    setTab("plan");
+  }
 
   async function buildTimeline(input: {
     arrival: string;
@@ -39,33 +66,44 @@ export default function App() {
     }
   }
 
-  function reset() {
+  function resetPlanner() {
     setTarget(null);
     setPlan(null);
     setError(null);
+    setManualPrefill(null);
   }
 
   return (
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <img src="/icon.svg" alt="" width={34} height={34} />
+          <img src="/icon.svg" alt="" width={40} height={40} />
           <div>
             <h1>Trailhead</h1>
-            <p>Campsite &amp; backcountry booking planner</p>
+            <p>National parks, planned to the minute</p>
           </div>
         </div>
         <nav className="tabs">
+          <button className={tab === "explore" ? "active" : ""} onClick={() => setTab("explore")}>
+            Explore parks
+          </button>
           <button className={tab === "plan" ? "active" : ""} onClick={() => setTab("plan")}>
-            Plan a trip
+            Plan a booking
           </button>
           <button className={tab === "lotteries" ? "active" : ""} onClick={() => setTab("lotteries")}>
-            Browse lotteries
+            Lotteries
           </button>
         </nav>
       </header>
 
       <main className="content">
+        {tab === "explore" &&
+          (openPark ? (
+            <ParkDetail slug={openPark} onBack={() => setOpenPark(null)} onPlanTarget={planFromGuide} />
+          ) : (
+            <ParkExplorer onOpen={setOpenPark} />
+          ))}
+
         {tab === "plan" && (
           <>
             {!target && (
@@ -80,7 +118,7 @@ export default function App() {
             )}
 
             {!target ? (
-              <SearchPanel onSelect={setTarget} />
+              <SearchPanel onSelect={setTarget} prefill={manualPrefill} />
             ) : (
               <div className="planning">
                 <div className="selected-bar">
@@ -89,12 +127,12 @@ export default function App() {
                     <strong>{target.name}</strong>
                     {target.parent_name && <span className="muted"> · {target.parent_name}</span>}
                   </div>
-                  <button className="link" onClick={reset}>
+                  <button className="link" onClick={resetPlanner}>
                     Change
                   </button>
                 </div>
 
-                <TripForm loading={loading} onBuild={buildTimeline} />
+                <TripForm loading={loading} onBuild={buildTimeline} defaultNights={defaultNights} />
                 {error && <div className="error">{error}</div>}
                 {plan && <TimelineView plan={plan} />}
               </div>
@@ -107,11 +145,12 @@ export default function App() {
 
       <footer className="footer">
         <p>
-          Booking rules and lottery dates are best-effort and change yearly — always confirm on{" "}
+          Booking rules, lottery dates, and guide details are best-effort and change yearly — always
+          confirm on{" "}
           <a href="https://www.recreation.gov" target="_blank" rel="noreferrer">
             recreation.gov
-          </a>
-          . Milestone 1 of 2: the timeline planner. Next up: last-minute availability alerts.
+          </a>{" "}
+          and the official park sites. Next up: last-minute availability alerts.
         </p>
       </footer>
     </div>
