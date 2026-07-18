@@ -62,10 +62,56 @@ imessage-insights unanswered --days 7           # threads awaiting your reply
 imessage-insights summarize "Weekend Trip"      # briefing for one thread
 imessage-insights digest --days 3 --top 5       # briefing across your 5 busiest groups
 imessage-insights digest --out today.md         # write it to a file
+
+# Never lose a message (reply reminders)
+imessage-insights followups --days 7            # prioritized list of who's waiting
+imessage-insights schedule install              # get notified automatically
 ```
 
 Each briefing gives a TL;DR, key points, **what's waiting on you**, open
 questions, and the thread's vibe.
+
+## Reply reminders — for messages that get lost
+
+If you tend to leave people on read by accident, this is the part for you. The
+`followups` command finds every thread whose last message is waiting on *you*,
+then has Claude rank them — a direct question that's three days old rises to the
+top, while "lol ok" gets dropped — and writes a prioritized brief:
+
+```
+# Reply reminders — Sat Jul 18, 09:00
+_3 waiting on a reply (ranked by Claude)._
+
+1. 🔴 **Mom** — waiting 3d
+    > Mom: Are you still coming Sunday?
+    _Direct question, unanswered 3 days._
+2. 🟠 **Weekend Trip 🏕️** — waiting 5h
+    > Alex: So are we meeting at 9am?
+    _Open logistics question for the group._
+```
+
+If Claude isn't available (no API key), it falls back to a local ranking by how
+long each message has been waiting — so it always works.
+
+### Make it automatic
+
+So you don't have to remember to run it, install a scheduled reminder. This sets
+up a macOS LaunchAgent that runs `followups --notify` at the times you choose and
+pops a native notification ("3 people waiting — top: Mom (3d)"):
+
+```bash
+imessage-insights schedule install --times "9:00,13:00,17:30"
+imessage-insights schedule status       # check it's loaded
+imessage-insights schedule uninstall     # stop the reminders
+```
+
+The full brief is written to `~/.imessage-insights/followups.md` each run; the
+notification points you there.
+
+> **Note:** the scheduled agent needs your `ANTHROPIC_API_KEY`, so `schedule
+> install` copies it (and any `IMSG_*` settings) from your current shell into the
+> LaunchAgent plist. The plist is written with `600` permissions (readable only
+> by you). Without a key, scheduled runs still work using the local ranking.
 
 ### Configuration
 
@@ -77,6 +123,9 @@ Environment variables (all optional):
 | `IMSG_MODEL` | `claude-opus-4-8` | Model for briefings. |
 | `IMSG_EFFORT` | `medium` | `low`/`medium`/`high`/`xhigh`/`max` — quality vs. cost. |
 | `IMSG_MAX_MESSAGES` | `300` | Max messages per thread sent to the API. |
+| `IMSG_REMINDER_TIMES` | `9:00,13:00,17:30` | Default reminder times for `schedule`. |
+| `IMSG_OUTPUT_DIR` | `~/.imessage-insights` | Where briefs and logs are written. |
+| `IMSG_MAX_FOLLOWUPS` | `25` | Max waiting threads ranked per reminder. |
 
 You can also point at a different database with `--db /path/to/chat.db`.
 
@@ -84,9 +133,10 @@ You can also point at a different database with `--db /path/to/chat.db`.
 
 - The `doctor`, `chats`, `show`, `stats`, and `unanswered` commands are **100%
   local** — nothing leaves your machine.
-- The `summarize` and `digest` commands send the relevant thread text to the
-  Anthropic API to produce the briefing. Nothing is written back to Messages and
-  no message is ever sent on your behalf.
+- The `summarize`, `digest`, and `followups` commands send the relevant thread
+  text to the Anthropic API (for briefings / ranking). `followups` degrades to a
+  fully-local ranking when no API key is set. Nothing is ever written back to
+  Messages and no message is ever sent on your behalf.
 
 ## Notes & limitations
 
@@ -99,10 +149,12 @@ You can also point at a different database with `--db /path/to/chat.db`.
 
 ## Roadmap
 
-This v1 covers **read + explore** and **group insights** — the two priorities
-chosen for the first version. Natural next steps:
+This v1 covers **read + explore**, **group insights**, and **reply reminders**.
+Natural next steps:
 
 - **Voice-matched draft replies** (draft-only, reviewed by you before sending):
-  learn your style from your own past messages and propose responses.
-- Per-thread digests on a schedule, and a "what did I miss" morning brief.
+  learn your style from your own past messages and propose responses — a natural
+  pairing with reply reminders (surface who's waiting, then draft the reply).
+- **Snooze / mark-done** so a reminder stops nagging once you've handled it.
+- A "what did I miss" morning brief combining the digest and followups.
 - A menu-bar UI over this same core.

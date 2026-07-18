@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Iterator
 
 from . import attributed_body, config
+from .contacts import resolve
 
 # chat.style: 43 == group conversation, 45 == one-to-one.
 GROUP_STYLE = 43
@@ -217,3 +218,16 @@ def _connect(path: Path) -> tuple[sqlite3.Connection, Path | None]:
 
 def default_window(days: int) -> datetime:
     return datetime.now() - timedelta(days=days)
+
+
+def thread_title(db: "ChatDB", chat: Chat, contacts: dict[str, str]) -> str:
+    """Human-friendly name for a chat: its display name, else its participants."""
+    if chat.display_name:
+        return chat.display_name
+    parts = db.participants(chat.rowid)
+    if not parts:
+        return chat.identifier or f"chat {chat.rowid}"
+    names = [resolve(p, contacts) for p in parts]
+    if len(names) > 4:
+        return ", ".join(names[:4]) + f" +{len(names) - 4}"
+    return ", ".join(names)

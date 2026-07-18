@@ -28,3 +28,17 @@ EFFORT = os.environ.get("IMSG_EFFORT", "medium")
 
 # Safety caps so a single huge thread can't blow up a request.
 MAX_MESSAGES_PER_SUMMARY = int(os.environ.get("IMSG_MAX_MESSAGES", "300"))
+
+# --- Reply reminders (followups / schedule) ---------------------------------
+# Where briefs and logs are written.
+OUTPUT_DIR = Path(
+    os.environ.get("IMSG_OUTPUT_DIR", str(Path.home() / ".imessage-insights"))
+)
+BRIEF_PATH = OUTPUT_DIR / "followups.md"
+
+# launchd LaunchAgent identity and default reminder times.
+LAUNCHD_LABEL = "com.imessage-insights.followups"
+DEFAULT_REMINDER_TIMES = os.environ.get("IMSG_REMINDER_TIMES", "9:00,13:00,17:30")
+
+# Most waiting threads to rank in a single reminder run.
+MAX_FOLLOWUPS = int(os.environ.get("IMSG_MAX_FOLLOWUPS", "25"))

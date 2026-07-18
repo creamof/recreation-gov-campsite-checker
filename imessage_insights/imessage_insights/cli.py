@@ -14,26 +14,19 @@ Read-only, local-first. Sub-commands:
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from . import __version__, chatdb
+from . import __version__, chatdb, config
 from .chatdb import Chat, ChatDB
 from .contacts import load_contacts, resolve
 
 
 def _title(chat: Chat, db: ChatDB, contacts: dict[str, str]) -> str:
-    if chat.display_name:
-        return chat.display_name
-    parts = db.participants(chat.rowid)
-    if not parts:
-        return chat.identifier or f"chat {chat.rowid}"
-    names = [resolve(p, contacts) for p in parts]
-    if len(names) > 4:
-        return ", ".join(names[:4]) + f" +{len(names) - 4}"
-    return ", ".join(names)
+    return chatdb.thread_title(db, chat, contacts)
 
 
 def _find_chat(db: ChatDB, needle: str, contacts: dict[str, str]) -> Chat | None:
@@ -206,6 +199,61 @@ def cmd_digest(args, db: ChatDB) -> int:
     return 0
 
 
+def cmd_followups(args, db: ChatDB) -> int:
+    from . import followups, notify
+
+    contacts = load_contacts()
+    since = chatdb.default_window(args.days)
+    items = followups.collect(db, since, groups_only=args.groups)
+    ranked, used_llm = followups.rank(db, items, contacts)
+    brief = followups.render_brief(ranked, contacts, used_llm)
+
+    out_path = Path(args.out) if args.out else config.BRIEF_PATH
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(brief, encoding="utf-8")
+
+    if args.notify and ranked:
+        notify.send(
+            followups.summary_line(ranked, contacts),
+            subtitle=f"Open {out_path}",
+        )
+    if args.open:
+        subprocess.run(["open", str(out_path)], check=False)
+    if not args.quiet:
+        print(brief)
+    return 0
+
+
+def cmd_schedule(args, db: ChatDB) -> int:
+    from . import schedule
+
+    if args.action == "install":
+        try:
+            path = schedule.install(args.times, db=args.db)
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+        print(f"Installed reply reminders at {args.times} → {path}")
+        if sys.platform != "darwin":
+            print("(Not on macOS: wrote the plist but couldn't load it with launchctl.)")
+        else:
+            print("You'll get a notification at those times. Test now with: "
+                  "imessage-insights followups --notify")
+    elif args.action == "uninstall":
+        print("Removed reply reminders." if schedule.uninstall()
+              else "No reminders were installed.")
+    else:  # status
+        info = schedule.status()
+        if not info["installed"]:
+            print("Reply reminders: not installed.")
+        else:
+            state = "loaded" if info["loaded"] else "installed (not loaded)"
+            print(f"Reply reminders: {state}")
+            print(f"  Times: {', '.join(info['times']) or 'n/a'}")
+            print(f"  Plist: {info['path']}")
+    return 0
+
+
 # -- argument parsing --------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
@@ -250,6 +298,30 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--top", type=int, default=5, help="Number of threads.")
     sp.add_argument("--out", help="Write markdown to this file instead of stdout.")
     sp.set_defaults(func=cmd_digest)
+
+    sp = sub.add_parser(
+        "followups", help="Prioritized list of messages awaiting your reply."
+    )
+    sp.add_argument("--days", type=int, default=7, help="Look back N days.")
+    sp.add_argument("--groups", action="store_true", help="Group chats only.")
+    sp.add_argument("--notify", action="store_true", help="Send a macOS notification.")
+    sp.add_argument("--open", action="store_true", help="Open the brief file.")
+    sp.add_argument("--quiet", action="store_true", help="Don't print the brief.")
+    sp.add_argument("--out", help="Brief output path (default ~/.imessage-insights/).")
+    sp.set_defaults(func=cmd_followups)
+
+    sp = sub.add_parser(
+        "schedule", help="Manage the automatic reply-reminder notifications."
+    )
+    sp.add_argument(
+        "action", choices=["install", "uninstall", "status"], nargs="?",
+        default="status",
+    )
+    sp.add_argument(
+        "--times", default=config.DEFAULT_REMINDER_TIMES,
+        help='Comma-separated HH:MM times, e.g. "9:00,13:00,17:30".',
+    )
+    sp.set_defaults(func=cmd_schedule, needs_db=False)
     return p
 
 
@@ -257,6 +329,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        # Some commands (e.g. schedule) don't need to open the database.
+        if getattr(args, "needs_db", True) is False:
+            return args.func(args, None)
         with ChatDB.open(args.db) as db:
             return args.func(args, db)
     except (FileNotFoundError, RuntimeError) as e:
