@@ -208,7 +208,7 @@ def analyze(
 
     with _client().messages.stream(
         model=config.MODEL,
-        max_tokens=8000,
+        max_tokens=16000,
         system=_SYSTEM + FOCUS_PROMPTS.get(focus, ""),
         thinking={"type": "adaptive"},
         output_config={"effort": config.EFFORT},
@@ -341,7 +341,7 @@ def analyze_timeline(
     )
     with _client().messages.stream(
         model=config.MODEL,
-        max_tokens=8000,
+        max_tokens=16000,
         system=_TIMELINE_SYSTEM + FOCUS_PROMPTS.get(focus, ""),
         thinking={"type": "adaptive"},
         output_config={"effort": config.EFFORT},
