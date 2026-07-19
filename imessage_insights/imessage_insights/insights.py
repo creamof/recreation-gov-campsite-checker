@@ -10,7 +10,7 @@ from datetime import datetime
 
 from . import config
 from .chatdb import Message
-from .contacts import resolve
+from .contacts import me_label, resolve
 
 _SYSTEM = """You are an assistant that reads a group text-message thread and \
 produces a concise, useful briefing for the user (referred to as "Me" in the \
@@ -32,7 +32,7 @@ def _render_transcript(
 ) -> str:
     lines = []
     for m in messages:
-        who = "Me" if m.is_from_me else resolve(m.handle, contacts)
+        who = me_label() if m.is_from_me else resolve(m.handle, contacts)
         stamp = m.date.strftime("%Y-%m-%d %H:%M")
         body = m.text
         if m.has_attachment and not body:

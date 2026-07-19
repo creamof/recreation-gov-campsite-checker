@@ -36,6 +36,9 @@ OUTPUT_DIR = Path(
 )
 BRIEF_PATH = OUTPUT_DIR / "followups.md"
 
+# Optional name-overrides / people notes (display names, your own name, pronouns).
+PEOPLE_PATH = OUTPUT_DIR / "people.json"
+
 # launchd LaunchAgent identity and default reminder times.
 LAUNCHD_LABEL = "com.imessage-insights.followups"
 DEFAULT_REMINDER_TIMES = os.environ.get("IMSG_REMINDER_TIMES", "9:00,13:00,17:30")

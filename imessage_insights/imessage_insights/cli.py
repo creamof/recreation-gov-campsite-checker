@@ -23,7 +23,7 @@ from pathlib import Path
 
 from . import __version__, chatdb, config
 from .chatdb import Chat, ChatDB
-from .contacts import load_contacts, resolve
+from .contacts import load_contacts, me_label, resolve
 
 
 def _title(chat: Chat, db: ChatDB, contacts: dict[str, str]) -> str:
@@ -100,7 +100,7 @@ def cmd_show(args, db: ChatDB) -> int:
     msgs = db.messages(chat.rowid, limit=args.limit)
     print(f"# {_title(chat, db, contacts)}  (chat {chat.rowid})\n")
     for m in msgs:
-        who = "Me" if m.is_from_me else resolve(m.handle, contacts)
+        who = me_label() if m.is_from_me else resolve(m.handle, contacts)
         stamp = m.date.strftime("%Y-%m-%d %H:%M")
         suffix = "  📎" if m.has_attachment else ""
         print(f"[{stamp}] {who}: {m.text}{suffix}")

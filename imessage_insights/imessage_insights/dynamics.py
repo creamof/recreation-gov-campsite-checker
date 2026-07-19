@@ -14,7 +14,7 @@ from datetime import datetime
 
 from . import config
 from .chatdb import Message
-from .contacts import resolve
+from .contacts import me_label, notes, resolve
 
 # Gap that marks a message as "starting" a fresh burst of conversation.
 _INITIATION_GAP_HOURS = 4.0
@@ -39,7 +39,19 @@ class PersonStats:
 
 
 def _speaker(m: Message, contacts: dict[str, str]) -> str:
-    return "Me" if m.is_from_me else resolve(m.handle, contacts)
+    return me_label() if m.is_from_me else resolve(m.handle, contacts)
+
+
+def _people_context() -> str:
+    """Authoritative participant notes for the model (identity, pronouns)."""
+    lines = [
+        f'In the transcript, the account owner (the user) is labeled "{me_label()}".'
+    ]
+    for name, note in notes().items():
+        lines.append(f"- {name}: {note}")
+    if len(lines) > 1:
+        lines.insert(1, "Use the correct name and pronouns for each person below:")
+    return "\n".join(lines)
 
 
 def compute_stats(
@@ -189,6 +201,7 @@ def analyze(
         f"Window: {len(messages)} messages "
         f"({messages[0].date:%Y-%m-%d} to {messages[-1].date:%Y-%m-%d}); "
         f"transcript below shows the most recent {len(sample)}.\n\n"
+        f"{_people_context()}\n\n"
         f"Per-person stats:\n{render_stats_table(stats)}\n\n"
         f"Transcript:\n{transcript}"
     )
@@ -322,6 +335,7 @@ def analyze_timeline(
 
     prompt = (
         f"Group: {title}\n\n"
+        f"{_people_context()}\n\n"
         f"Share of messages by period:\n{timeline_share_table(buckets, contacts)}\n\n"
         f"Sampled messages by period:\n\n" + "\n\n".join(parts)
     )

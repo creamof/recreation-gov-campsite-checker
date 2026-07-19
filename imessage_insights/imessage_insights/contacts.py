@@ -6,11 +6,48 @@ databases can't be read, handles are shown as-is (phone number / email).
 
 from __future__ import annotations
 
+import functools
+import json
 import re
 import sqlite3
 from pathlib import Path
 
 from . import config
+
+
+@functools.lru_cache(maxsize=1)
+def _overrides() -> dict:
+    """Load ~/.imessage-insights/people.json (display renames, your name, notes)."""
+    default = {"me": "Me", "rename": {}, "notes": {}}
+    path = config.PEOPLE_PATH
+    if not path.exists():
+        return default
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return default
+    return {
+        "me": data.get("me") or "Me",
+        "rename": dict(data.get("rename") or {}),
+        "notes": dict(data.get("notes") or {}),
+    }
+
+
+def me_label() -> str:
+    """Display name for the account owner (your own messages). Default 'Me'."""
+    return _overrides()["me"]
+
+
+def notes() -> dict[str, str]:
+    """Per-person hints (e.g. pronouns) to pass to the model."""
+    return _overrides()["notes"]
+
+
+def _apply_rename(name: str, handle: str = "") -> str:
+    rename = _overrides()["rename"]
+    if handle and handle in rename:
+        return rename[handle]
+    return rename.get(name, name)
 
 
 def _normalize_phone(value: str) -> str:
@@ -84,12 +121,13 @@ def _load_from(conn: sqlite3.Connection, mapping: dict[str, str]) -> None:
 
 
 def resolve(handle: str, contacts: dict[str, str]) -> str:
-    """Resolve a handle to a name, falling back to the handle itself."""
+    """Resolve a handle to a name (address book, then user overrides)."""
     if not handle:
         return "Unknown"
     if handle in contacts:
-        return contacts[handle]
-    if "@" in handle:
-        return contacts.get(handle.lower(), handle)
-    key = _normalize_phone(handle)
-    return contacts.get(key, handle)
+        base = contacts[handle]
+    elif "@" in handle:
+        base = contacts.get(handle.lower(), handle)
+    else:
+        base = contacts.get(_normalize_phone(handle), handle)
+    return _apply_rename(base, handle)

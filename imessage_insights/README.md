@@ -128,6 +128,31 @@ imessage-insights timeline "Moulton-Barry" --focus tension # track friction over
 imessage-insights timeline "Moulton-Barry" --no-ai         # just the share table
 ```
 
+## Fixing names & pronouns
+
+Names come from your Mac's Contacts, which are sometimes wrong (a nickname like
+"Mom", a mis-saved contact, or the wrong person). Create
+`~/.imessage-insights/people.json` to override them everywhere — stats, reports,
+and the AI reads:
+
+```json
+{
+  "me": "David",
+  "rename": {
+    "Karen Osborn": "Ben Osborn",
+    "Mom": "Jennifer"
+  },
+  "notes": {
+    "Ben Osborn": "male (he/him)"
+  }
+}
+```
+
+- **`me`** — your own display name (default "Me").
+- **`rename`** — map a current name *or* a phone/email to the correct name.
+- **`notes`** — per-person hints (pronouns, relationship) passed to the model so
+  it stops guessing wrong (e.g. calling Ben "she").
+
 ## Reply reminders — for messages that get lost
 
 If you tend to leave people on read by accident, this is the part for you. The
