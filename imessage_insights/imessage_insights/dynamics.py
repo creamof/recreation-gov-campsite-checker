@@ -212,6 +212,23 @@ def bucket_by_period(messages: list[Message], by: str = "year") -> dict:
     return buckets
 
 
+def filter_periods(buckets: dict, min_fraction: float = 0.03) -> tuple[dict, list]:
+    """Drop periods that are too small to be meaningful (e.g. a 5-message year).
+
+    A period is kept if it has at least ``min_fraction`` of the busiest period's
+    message count (floor of 10). Returns (kept_buckets, dropped_labels).
+    """
+    if not buckets:
+        return buckets, []
+    biggest = max(len(m) for m in buckets.values())
+    threshold = max(10, int(biggest * min_fraction))
+    kept, dropped = {}, []
+    for label, msgs in buckets.items():
+        (kept.__setitem__(label, msgs) if len(msgs) >= threshold
+         else dropped.append(label))
+    return (kept or buckets), dropped
+
+
 def _trend(shares: list[float]) -> str:
     if len(shares) < 2:
         return "→"

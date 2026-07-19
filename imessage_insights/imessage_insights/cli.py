@@ -263,11 +263,17 @@ def cmd_timeline(args, db: ChatDB) -> int:
         print("No messages to analyze.")
         return 1
     buckets = dynamics.bucket_by_period(msgs, by=args.by)
+    dropped = []
+    if not args.all_periods:
+        buckets, dropped = dynamics.filter_periods(buckets)
     title = _title(chat, db, contacts)
 
     print(f"# Dynamics over time — {title}")
     print(f"_{len(msgs)} messages across {len(buckets)} {args.by}s "
           f"({msgs[0].date:%Y-%m} → {msgs[-1].date:%Y-%m})_\n")
+    if dropped:
+        print(f"_(Skipped {', '.join(dropped)} — too few messages to be "
+              f"meaningful; use --all-periods to include them.)_\n")
     print(dynamics.timeline_share_table(buckets, contacts))
 
     if args.no_ai:
@@ -413,6 +419,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--focus", choices=["balanced", "tension", "humor", "engagement"],
         default="balanced", help="Sharpen the narrative toward one dimension.",
     )
+    sp.add_argument("--all-periods", action="store_true",
+                    help="Include tiny periods (default drops negligible ones).")
     sp.add_argument("--no-ai", action="store_true", help="Local share table only.")
     sp.add_argument("--out", help="Also write the full report to this markdown file.")
     sp.set_defaults(func=cmd_timeline)
