@@ -173,6 +173,41 @@ class ChatDB:
         msgs = self.messages(chat_id, limit=1)
         return msgs[-1] if msgs else None
 
+    def reaction_counts(
+        self, chat_id: int, since: datetime | None = None
+    ) -> dict[str, int]:
+        """Count tapbacks/reactions each participant sent in a chat.
+
+        Returns {handle_or_'me': count}. Reactions are messages with a non-zero
+        associated_message_type (the normal message views filter these out).
+        """
+        params: list = [chat_id]
+        clause = ""
+        if since is not None:
+            apple_ns = int(
+                (since.timestamp() - config.APPLE_EPOCH_OFFSET) * 1_000_000_000
+            )
+            clause = "AND m.date >= ?"
+            params.append(apple_ns)
+        rows = self.conn.execute(
+            f"""
+            SELECT m.is_from_me AS me, h.id AS handle
+            FROM message m
+            JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
+            LEFT JOIN handle h ON h.ROWID = m.handle_id
+            WHERE cmj.chat_id = ?
+              AND m.associated_message_type != 0
+              {clause}
+            """,
+            params,
+        ).fetchall()
+        counts: dict[str, int] = {}
+        for r in rows:
+            key = "me" if r["me"] else (r["handle"] or "")
+            if key:
+                counts[key] = counts.get(key, 0) + 1
+        return counts
+
     def activity_counts(self, since: datetime | None = None) -> dict[int, int]:
         """Return {chat_id: message_count}, optionally limited to recent days."""
         params: list = []

@@ -66,10 +66,38 @@ imessage-insights digest --out today.md         # write it to a file
 # Never lose a message (reply reminders)
 imessage-insights followups --days 7            # prioritized list of who's waiting
 imessage-insights schedule install              # get notified automatically
+
+# Read the room (group-chat dynamics)
+imessage-insights dynamics "Moulton-Barry"      # tone, humor, roles, who stirs the pot
+imessage-insights dynamics "Moulton-Barry" --no-ai   # just the local stats table
 ```
 
 Each briefing gives a TL;DR, key points, **what's waiting on you**, open
 questions, and the thread's vibe.
+
+## Group-chat dynamics — read the room
+
+`dynamics` profiles a group thread: who talks, who's funny, who's checked out,
+and who's stirring the pot. It has two layers:
+
+- **Local stats** (always shown, no API): per person — message share, average
+  length, how often they ask questions, laughter/emoji rate, how many
+  conversations they kick off, and how many reactions they send.
+- **Claude's read** (needs an API key): a grounded write-up — the group's vibe,
+  each person's role/archetype and style, the funniest member (with a quoted
+  bit), who barely engages, and who provokes friction. Every characterization is
+  backed by a real quote from the thread.
+
+```bash
+imessage-insights dynamics "Moulton-Barry"           # full read
+imessage-insights dynamics "Moulton-Barry" --days 90 # just the last 90 days
+imessage-insights dynamics "Moulton-Barry" --no-ai   # stats table only
+imessage-insights dynamics "Moulton-Barry" --out room.md   # save the report
+```
+
+You can name a chat by its group name, by any substring, or by the members
+(`"Moulton-Barry"` matches a group containing both Moulton and Barry). Use
+`chats --groups` to see the exact names and ids.
 
 ## Reply reminders — for messages that get lost
 

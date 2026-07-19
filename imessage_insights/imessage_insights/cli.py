@@ -14,6 +14,7 @@ Read-only, local-first. Sub-commands:
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -36,11 +37,21 @@ def _find_chat(db: ChatDB, needle: str, contacts: dict[str, str]) -> Chat | None
             if c.rowid == int(needle):
                 return c
     low = needle.lower()
-    # Prefer a title/identifier match.
+    # Prefer a direct title/identifier substring match.
     for c in chats:
         title = _title(c, db, contacts).lower()
         if low in title or low in c.identifier.lower():
             return c
+    # Fall back to token matching: "Moulton-Barry" -> all of {moulton, barry}
+    # must appear across the chat's name and participant names.
+    tokens = [t for t in re.split(r"[^a-z0-9]+", low) if t]
+    if tokens:
+        for c in chats:
+            hay = (_title(c, db, contacts) + " "
+                   + " ".join(resolve(p, contacts) for p in db.participants(c.rowid)))
+            hay = hay.lower()
+            if all(t in hay for t in tokens):
+                return c
     return None
 
 
@@ -199,6 +210,46 @@ def cmd_digest(args, db: ChatDB) -> int:
     return 0
 
 
+def cmd_dynamics(args, db: ChatDB) -> int:
+    from . import dynamics
+
+    contacts = load_contacts()
+    chat = _find_chat(db, args.chat, contacts)
+    if not chat:
+        print(f"No chat matched {args.chat!r}. Try `chats --groups` to list them.")
+        return 1
+
+    since = chatdb.default_window(args.days) if args.days else None
+    msgs = db.messages(chat.rowid, since=since)
+    if not msgs:
+        print("No messages in that window.")
+        return 1
+    reactions = db.reaction_counts(chat.rowid, since=since)
+    stats = dynamics.compute_stats(msgs, reactions, contacts)
+    title = _title(chat, db, contacts)
+
+    print(f"# Group dynamics — {title}")
+    print(f"_{len(msgs)} messages, {len(stats)} people"
+          + (f", last {args.days} days" if args.days else "") + "_\n")
+    print(dynamics.render_stats_table(stats))
+
+    if args.no_ai:
+        return 0
+    print("\n---\n")
+    try:
+        report = dynamics.analyze(title, stats, msgs, contacts)
+        out = f"# Group dynamics — {title}\n\n{dynamics.render_stats_table(stats)}\n\n{report}\n"
+        if args.out:
+            Path(args.out).write_text(out, encoding="utf-8")
+            print(f"(Wrote full report to {args.out})")
+        print(report)
+    except RuntimeError as e:
+        print(f"_Skipping the AI read: {e}_")
+        print("_(The stats above are still complete. Set ANTHROPIC_API_KEY for "
+              "the full analysis.)_")
+    return 0
+
+
 def cmd_followups(args, db: ChatDB) -> int:
     from . import followups, notify
 
@@ -298,6 +349,15 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--top", type=int, default=5, help="Number of threads.")
     sp.add_argument("--out", help="Write markdown to this file instead of stdout.")
     sp.set_defaults(func=cmd_digest)
+
+    sp = sub.add_parser(
+        "dynamics", help="Analyze a group chat's social dynamics (tone, humor, roles)."
+    )
+    sp.add_argument("chat", help="Chat id, name, or participant names (e.g. Moulton-Barry).")
+    sp.add_argument("--days", type=int, default=0, help="Only analyze the last N days.")
+    sp.add_argument("--no-ai", action="store_true", help="Local stats only, no API call.")
+    sp.add_argument("--out", help="Also write the full report to this markdown file.")
+    sp.set_defaults(func=cmd_dynamics)
 
     sp = sub.add_parser(
         "followups", help="Prioritized list of messages awaiting your reply."
