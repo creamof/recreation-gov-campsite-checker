@@ -48,9 +48,17 @@ def _client():
     except ImportError as e:
         raise RuntimeError(
             "The Claude API client isn't installed. Run "
-            "`pip install anthropic` to use summarize/digest."
+            "`python3 -m pip install --user --break-system-packages anthropic`."
         ) from e
-    return anthropic.Anthropic()
+    from .settings import get_api_key
+
+    key = get_api_key()
+    if not key:
+        raise RuntimeError(
+            "No Anthropic API key found. Run the `setup` command to save one, "
+            "or set the ANTHROPIC_API_KEY environment variable."
+        )
+    return anthropic.Anthropic(api_key=key)
 
 
 def summarize_thread(

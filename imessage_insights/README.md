@@ -29,29 +29,45 @@ Forwarding).
    Access → enable it for your terminal app (Terminal or iTerm). This is
    required to read `chat.db`. Quit and reopen the terminal afterward.
 
-2. **Install.**
+2. **Install** (one command — sets up the library and a double-clickable launcher):
    ```bash
-   cd imessage_insights
-   pip install -e .          # installs the `imessage-insights` command + anthropic
+   bash install.sh
    ```
-   (Only `summarize`/`digest` need `anthropic`; the rest use the standard
-   library, so you can also just run `python3 -m imessage_insights ...`.)
+   This drops an **"iMessage Insights"** launcher on your Desktop. Double-click it
+   to open a simple menu — no commands to remember. (Everything also works by
+   typing `python3 -m imessage_insights <command>`.)
 
-3. **Verify access.**
+3. **Add your API key** (needed for the AI features — draft replies, briefings):
    ```bash
-   imessage-insights doctor
+   python3 -m imessage_insights setup
+   ```
+   Paste your key from [console.anthropic.com](https://console.anthropic.com); it's
+   saved privately to `~/.imessage-insights/config.json` (no need to edit your
+   shell profile). You can also do this from the menu → **Settings**.
+
+4. **Verify access.**
+   ```bash
+   python3 -m imessage_insights doctor
    ```
    If it reports messages, you're set. If it says the database is empty or
    permission-denied, re-check Full Disk Access.
 
-4. **For AI briefings, set your API key.**
-   ```bash
-   export ANTHROPIC_API_KEY=sk-ant-...
-   ```
-
 ## Usage
 
+The easiest way is the **menu** — run it with no command (or double-click the
+Desktop launcher):
+
 ```bash
+python3 -m imessage_insights          # opens the interactive menu
+```
+
+Or call commands directly:
+
+```bash
+# Draft a reply in your voice (draft-only — you review and send)
+imessage-insights draft "Weekend Trip"            # proposes reply options
+imessage-insights draft "Sean" --about "I can't make Saturday" --copy 1
+
 # Explore (all local, no API)
 imessage-insights chats --groups --days 30      # most active group chats this month
 imessage-insights show "Weekend Trip"           # print a thread by name/id/substring
@@ -74,6 +90,22 @@ imessage-insights dynamics "Moulton-Barry" --no-ai   # just the local stats tabl
 
 Each briefing gives a TL;DR, key points, **what's waiting on you**, open
 questions, and the thread's vibe.
+
+## Draft replies in your voice
+
+`draft` reads your own past messages to learn how you write, then proposes reply
+options for a thread that sound like you — the right length, punctuation, emoji
+habits, and tone. It's **draft-only**: nothing is ever sent. You review, pick one,
+and send it yourself.
+
+```bash
+imessage-insights draft "Mom"                       # a few options in your voice
+imessage-insights draft "Sean" --about "running 10 min late"   # steer the reply
+imessage-insights draft "Mom" --copy 2              # copy option 2 to the clipboard
+```
+
+`--copy N` puts option N on your clipboard so you can paste it straight into
+Messages. From the menu, just pick **Draft a reply in my voice**.
 
 ## Group-chat dynamics — read the room
 

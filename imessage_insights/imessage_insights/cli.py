@@ -14,6 +14,7 @@ Read-only, local-first. Sub-commands:
 from __future__ import annotations
 
 import argparse
+import getpass
 import re
 import subprocess
 import sys
@@ -217,6 +218,140 @@ def _parse_date(s: str) -> datetime:
         raise SystemExit(f"Bad date {s!r} — use YYYY-MM-DD (e.g. 2025-03-01).")
 
 
+def _copy_clipboard(text: str) -> bool:
+    try:
+        subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=False, timeout=5)
+        return True
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def cmd_draft(args, db: ChatDB) -> int:
+    from . import draft
+
+    contacts = load_contacts()
+    chat = _find_chat(db, args.chat, contacts)
+    if not chat:
+        print(f"No chat matched {args.chat!r}. Try `chats` to list them.")
+        return 1
+    thread = db.messages(chat.rowid, limit=30)
+    if not thread:
+        print("No messages in that thread.")
+        return 1
+    voice = db.my_messages(limit=300)
+    if len(voice) < 10:
+        print("(Heads up: not many of your own messages found, so the voice "
+              "match may be rough.)")
+
+    title = _title(chat, db, contacts)
+    print(f"# Draft replies — {title}\n")
+    for m in thread[-5:]:
+        who = me_label() if m.is_from_me else resolve(m.handle, contacts)
+        preview = m.text[:80] + ("…" if len(m.text) > 80 else "")
+        print(f"  {who}: {preview}")
+    print()
+    try:
+        options = draft.draft_replies(thread, voice, contacts, n=args.num, about=args.about)
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 2
+    if not options:
+        print("No drafts produced — try again or add --about to steer it.")
+        return 1
+    for i, opt in enumerate(options, 1):
+        print(f"[{i}] {opt}\n")
+    print("These are drafts — review, then send yourself. "
+          "Copy one with: draft ... --copy N")
+    if args.copy:
+        idx = args.copy - 1
+        if 0 <= idx < len(options) and _copy_clipboard(options[idx]):
+            print(f"\n✓ Copied option {args.copy} to your clipboard — "
+                  f"paste it into Messages.")
+    return 0
+
+
+def cmd_setup(args, db: ChatDB) -> int:
+    from . import settings
+
+    print("iMessage Insights — setup\n")
+    print(f"✓ Messages database readable ({db.message_count():,} messages).")
+    if settings.get_api_key() and not args.force:
+        print("✓ Anthropic API key already configured.")
+    else:
+        print("\nPaste your Anthropic API key (from console.anthropic.com → API "
+              "Keys). It's saved privately to ~/.imessage-insights/config.json.")
+        try:
+            key = getpass.getpass("API key (hidden as you type): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            key = ""
+        if key:
+            settings.set_api_key(key)
+            print("✓ Saved.")
+        else:
+            print("Skipped — run `setup` again anytime to add it.")
+    print("\nAll set. From here you can: draft replies, get reply reminders, "
+          "or analyze a chat.")
+    return 0
+
+
+def _ns(**kw) -> argparse.Namespace:
+    return argparse.Namespace(**kw)
+
+
+def cmd_menu(args, db: ChatDB) -> int:
+    return run_menu(db)
+
+
+def run_menu(db: ChatDB) -> int:
+    while True:
+        print("""
+========  iMessage Insights  ========
+  1) Who's waiting on my reply
+  2) Draft a reply in my voice
+  3) Analyze a group chat
+  4) List my chats
+  5) Set up automatic reminders
+  6) Settings (API key)
+  0) Quit
+""")
+        try:
+            choice = input("Pick a number: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return 0
+
+        if choice in ("0", "q", "quit", "exit"):
+            return 0
+        elif choice == "1":
+            cmd_followups(_ns(days=7, groups=False, notify=False, open=False,
+                              quiet=False, out=None), db)
+        elif choice == "2":
+            name = input("Which chat or person? ").strip()
+            if name:
+                cmd_draft(_ns(chat=name, num=3, about=None, copy=0), db)
+        elif choice == "3":
+            name = input("Which group chat? ").strip()
+            if name:
+                focus = input("Focus — balanced / tension / humor / engagement "
+                              "[balanced]: ").strip() or "balanced"
+                cmd_dynamics(_ns(chat=name, days=0, since=None, until=None,
+                                 focus=focus, no_ai=False, out=None), db)
+        elif choice == "4":
+            cmd_chats(_ns(groups=False, days=0, limit=30), db)
+        elif choice == "5":
+            times = input(f"Reminder times [{config.DEFAULT_REMINDER_TIMES}]: "
+                          ).strip() or config.DEFAULT_REMINDER_TIMES
+            cmd_schedule(_ns(action="install", times=times, db=None), db)
+        elif choice == "6":
+            cmd_setup(_ns(force=True), db)
+        else:
+            print("Didn't recognize that — pick a number from the list.")
+        try:
+            input("\n(Press Enter to return to the menu)")
+        except (EOFError, KeyboardInterrupt):
+            return 0
+
+
 def cmd_dynamics(args, db: ChatDB) -> int:
     from . import dynamics
 
@@ -383,7 +518,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--version", action="version", version=__version__)
     p.add_argument("--db", type=Path, help="Path to chat.db (default: ~/Library/Messages/chat.db)")
-    sub = p.add_subparsers(dest="command", required=True)
+    sub = p.add_subparsers(dest="command")
 
     sp = sub.add_parser("doctor", help="Check database access.")
     sp.set_defaults(func=cmd_doctor)
@@ -475,6 +610,21 @@ def build_parser() -> argparse.ArgumentParser:
         help='Comma-separated HH:MM times, e.g. "9:00,13:00,17:30".',
     )
     sp.set_defaults(func=cmd_schedule, needs_db=False)
+
+    sp = sub.add_parser("draft", help="Draft reply options in your voice for a thread.")
+    sp.add_argument("chat", help="Chat id, name, or participant names.")
+    sp.add_argument("-n", "--num", type=int, default=3, help="How many options.")
+    sp.add_argument("--about", help="What you want the reply to convey.")
+    sp.add_argument("--copy", type=int, default=0, metavar="N",
+                    help="Copy option N to the clipboard.")
+    sp.set_defaults(func=cmd_draft)
+
+    sp = sub.add_parser("setup", help="Save your API key and check access.")
+    sp.add_argument("--force", action="store_true", help="Re-enter the key even if set.")
+    sp.set_defaults(func=cmd_setup)
+
+    sp = sub.add_parser("menu", help="Interactive menu (also the default with no command).")
+    sp.set_defaults(func=cmd_menu)
     return p
 
 
@@ -482,6 +632,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        # No sub-command → open the interactive menu.
+        if not getattr(args, "command", None):
+            with ChatDB.open(args.db) as db:
+                return run_menu(db)
         # Some commands (e.g. schedule) don't need to open the database.
         if getattr(args, "needs_db", True) is False:
             return args.func(args, None)

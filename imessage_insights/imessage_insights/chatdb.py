@@ -173,6 +173,29 @@ class ChatDB:
         msgs = self.messages(chat_id, limit=1)
         return msgs[-1] if msgs else None
 
+    def my_messages(self, limit: int = 400, min_len: int = 2) -> list[str]:
+        """Your own recent sent messages across all chats — a voice sample."""
+        rows = self.conn.execute(
+            """
+            SELECT m.text, m.attributedBody
+            FROM message m
+            WHERE m.is_from_me = 1 AND m.item_type = 0
+              AND m.associated_message_type = 0
+            ORDER BY m.date DESC
+            LIMIT ?
+            """,
+            (limit * 3,),
+        ).fetchall()
+        out: list[str] = []
+        for r in rows:
+            text = (r["text"] or attributed_body.decode(r["attributedBody"]) or "").strip()
+            # Skip URLs / reactions / one-word acks for a cleaner style signal.
+            if len(text) >= min_len and not text.startswith("http"):
+                out.append(text)
+            if len(out) >= limit:
+                break
+        return out
+
     def reaction_counts(
         self, chat_id: int, since: datetime | None = None
     ) -> dict[str, int]:
