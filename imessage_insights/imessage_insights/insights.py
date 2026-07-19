@@ -73,7 +73,7 @@ def summarize_thread(
 
     with _client().messages.stream(
         model=config.MODEL,
-        max_tokens=2000,
+        max_tokens=6000,
         system=_SYSTEM,
         thinking={"type": "adaptive"},
         output_config={"effort": config.EFFORT},

@@ -158,6 +158,17 @@ FOCUS_PROMPTS = {
 }
 
 
+def _extract_text(message) -> str:
+    """Pull the final text out of a streamed message, handling edge cases."""
+    if message.stop_reason == "refusal":
+        return "_The model declined to analyze this thread._"
+    text = "".join(b.text for b in message.content if b.type == "text").strip()
+    if not text:
+        return ("_The model ran out of output budget before writing its answer. "
+                "Try again, or set IMSG_EFFORT=low for a shorter pass._")
+    return text
+
+
 def analyze(
     title: str,
     stats: list[PersonStats],
@@ -184,7 +195,7 @@ def analyze(
 
     with _client().messages.stream(
         model=config.MODEL,
-        max_tokens=3000,
+        max_tokens=8000,
         system=_SYSTEM + FOCUS_PROMPTS.get(focus, ""),
         thinking={"type": "adaptive"},
         output_config={"effort": config.EFFORT},
@@ -192,9 +203,7 @@ def analyze(
     ) as stream:
         message = stream.get_final_message()
 
-    if message.stop_reason == "refusal":
-        return "_The model declined to analyze this thread._"
-    return "".join(b.text for b in message.content if b.type == "text").strip()
+    return _extract_text(message)
 
 
 # --- Timeline: how the group's dynamics shifted over time -------------------
@@ -318,7 +327,7 @@ def analyze_timeline(
     )
     with _client().messages.stream(
         model=config.MODEL,
-        max_tokens=4000,
+        max_tokens=8000,
         system=_TIMELINE_SYSTEM + FOCUS_PROMPTS.get(focus, ""),
         thinking={"type": "adaptive"},
         output_config={"effort": config.EFFORT},
@@ -326,6 +335,4 @@ def analyze_timeline(
     ) as stream:
         message = stream.get_final_message()
 
-    if message.stop_reason == "refusal":
-        return "_The model declined to analyze this thread._"
-    return "".join(b.text for b in message.content if b.type == "text").strip()
+    return _extract_text(message)
