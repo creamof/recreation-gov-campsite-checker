@@ -138,11 +138,32 @@ examples). If nobody really does, say so plainly.
 to whom."""
 
 
+# Optional lenses that sharpen the analysis toward one dimension.
+FOCUS_PROMPTS = {
+    "balanced": "",
+    "tension": "\n\nSHARPEN THE FOCUS on friction and pot-stirring. Name who "
+    "provokes, needles, baits, or escalates, and who's passive-aggressive. Map "
+    "any factions or alliances and who sides with whom. Call out recurring "
+    "flashpoints and what sets them off, and who tends to defuse. Quote the "
+    "moments. Distinguish playful ribbing from genuine tension — be fair, but "
+    "don't soften real friction into nothing.",
+    "humor": "\n\nSHARPEN THE FOCUS on comedy. Identify who actually makes the "
+    "group laugh (not just who laughs), each person's comedic style (dry, "
+    "absurd, roast, self-deprecating), the running bits, and the single funniest "
+    "line in the sample. Quote liberally.",
+    "engagement": "\n\nSHARPEN THE FOCUS on who carries the chat versus who "
+    "coasts. Who initiates and sustains conversation, who only reacts, who's "
+    "drifting away, and whether replies are reciprocated. Note anyone who seems "
+    "to be pulling back over time.",
+}
+
+
 def analyze(
     title: str,
     stats: list[PersonStats],
     messages: list[Message],
     contacts: dict[str, str],
+    focus: str = "balanced",
 ) -> str:
     """Return a markdown dynamics report from Claude. Raises on API problems."""
     from .insights import _client  # reuse the shared client + friendly errors
@@ -164,7 +185,124 @@ def analyze(
     with _client().messages.stream(
         model=config.MODEL,
         max_tokens=3000,
-        system=_SYSTEM,
+        system=_SYSTEM + FOCUS_PROMPTS.get(focus, ""),
+        thinking={"type": "adaptive"},
+        output_config={"effort": config.EFFORT},
+        messages=[{"role": "user", "content": prompt}],
+    ) as stream:
+        message = stream.get_final_message()
+
+    if message.stop_reason == "refusal":
+        return "_The model declined to analyze this thread._"
+    return "".join(b.text for b in message.content if b.type == "text").strip()
+
+
+# --- Timeline: how the group's dynamics shifted over time -------------------
+def bucket_by_period(messages: list[Message], by: str = "year") -> dict:
+    """Group messages into ordered time buckets ("2021", "2021 Q2", "2021-06")."""
+    buckets: dict[str, list[Message]] = {}
+    for m in messages:
+        if by == "quarter":
+            label = f"{m.date.year} Q{(m.date.month - 1) // 3 + 1}"
+        elif by == "month":
+            label = f"{m.date:%Y-%m}"
+        else:
+            label = str(m.date.year)
+        buckets.setdefault(label, []).append(m)
+    return buckets
+
+
+def _trend(shares: list[float]) -> str:
+    if len(shares) < 2:
+        return "→"
+    delta = shares[-1] - shares[0]
+    return "↑" if delta > 5 else "↓" if delta < -5 else "→"
+
+
+def timeline_share_table(buckets: dict, contacts: dict[str, str], top: int = 8) -> str:
+    """Markdown table of each person's % share of messages per period."""
+    periods = list(buckets.keys())
+    period_totals = {p: len(msgs) for p, msgs in buckets.items()}
+    per: dict[str, dict[str, int]] = {}
+    totals: dict[str, int] = {}
+    for p, msgs in buckets.items():
+        for m in msgs:
+            name = _speaker(m, contacts)
+            per.setdefault(name, {})
+            per[name][p] = per[name].get(p, 0) + 1
+            totals[name] = totals.get(name, 0) + 1
+
+    people = sorted(totals, key=lambda n: totals[n], reverse=True)[:top]
+    header = "| Person | " + " | ".join(periods) + " | Trend |"
+    sep = "|---|" + "---:|" * len(periods) + "---|"
+    lines = [header, sep]
+    for name in people:
+        shares, cells = [], []
+        for p in periods:
+            c = per.get(name, {}).get(p, 0)
+            share = 100 * c / period_totals[p] if period_totals[p] else 0
+            shares.append(share)
+            cells.append(f"{share:.0f}%")
+        lines.append(f"| {name} | " + " | ".join(cells) + f" | {_trend(shares)} |")
+    lines.append(
+        "| _total msgs_ | " + " | ".join(str(period_totals[p]) for p in periods)
+        + " | |"
+    )
+    return "\n".join(lines)
+
+
+def _sample(msgs: list[Message], k: int) -> list[Message]:
+    if len(msgs) <= k:
+        return msgs
+    step = len(msgs) / k
+    return [msgs[int(i * step)] for i in range(k)]
+
+
+_TIMELINE_SYSTEM = """You trace how a group text thread has changed over time for \
+its member ("Me"). You're given the message-share table by period and a sample of \
+messages from each period. Tell the story of the group across the eras.
+
+Ground claims in the samples; quote briefly. Be candid but good-natured — this is \
+the user's own family/friends.
+
+Write markdown:
+- **The arc** — a short narrative of how the group evolved (who rose, who faded, \
+how the energy and tone shifted across the periods).
+- **Era by era** — one line per period capturing its character and dominant voices.
+- **Risers & faders** — who grew into the chat and who drifted out.
+- **Turning points** — moments the vibe shifted (warmer, tenser, quieter) and what \
+seemed to drive it."""
+
+
+def analyze_timeline(
+    title: str,
+    buckets: dict,
+    contacts: dict[str, str],
+    focus: str = "balanced",
+    budget: int = 400,
+) -> str:
+    """Return a markdown narrative of the group's evolution. Raises on API errors."""
+    from .insights import _client
+
+    periods = list(buckets.keys())
+    per_period = max(8, budget // max(1, len(periods)))
+    parts = []
+    for p in periods:
+        sample = _sample(buckets[p], per_period)
+        tx = "\n".join(
+            f"[{m.date:%Y-%m-%d}] {_speaker(m, contacts)}: {m.text}" for m in sample
+        )
+        parts.append(f"=== {p} ({len(buckets[p])} messages) ===\n{tx}")
+
+    prompt = (
+        f"Group: {title}\n\n"
+        f"Share of messages by period:\n{timeline_share_table(buckets, contacts)}\n\n"
+        f"Sampled messages by period:\n\n" + "\n\n".join(parts)
+    )
+    with _client().messages.stream(
+        model=config.MODEL,
+        max_tokens=4000,
+        system=_TIMELINE_SYSTEM + FOCUS_PROMPTS.get(focus, ""),
         thinking={"type": "adaptive"},
         output_config={"effort": config.EFFORT},
         messages=[{"role": "user", "content": prompt}],

@@ -95,9 +95,31 @@ imessage-insights dynamics "Moulton-Barry" --no-ai   # stats table only
 imessage-insights dynamics "Moulton-Barry" --out room.md   # save the report
 ```
 
+**Sharpen the lens** with `--focus`:
+
+```bash
+imessage-insights dynamics "Moulton-Barry" --focus tension     # who stirs the pot, factions, flashpoints
+imessage-insights dynamics "Moulton-Barry" --focus humor       # who's actually funny, with the best lines
+imessage-insights dynamics "Moulton-Barry" --focus engagement  # who carries it vs. who's drifting
+```
+
 You can name a chat by its group name, by any substring, or by the members
 (`"Moulton-Barry"` matches a group containing both Moulton and Barry). Use
 `chats --groups` to see the exact names and ids.
+
+### How it's changed over time
+
+`timeline` shows the group's evolution: a per-year table of each person's share
+of the conversation (with ↑/↓ trend arrows for who's rising or fading), plus a
+Claude narrative of the arc — who grew into the chat, who drifted out, and when
+the tone shifted.
+
+```bash
+imessage-insights timeline "Moulton-Barry"                 # by year
+imessage-insights timeline "Moulton-Barry" --by quarter    # finer buckets
+imessage-insights timeline "Moulton-Barry" --focus tension # track friction over time
+imessage-insights timeline "Moulton-Barry" --no-ai         # just the share table
+```
 
 ## Reply reminders — for messages that get lost
 

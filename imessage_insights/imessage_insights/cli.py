@@ -237,7 +237,7 @@ def cmd_dynamics(args, db: ChatDB) -> int:
         return 0
     print("\n---\n")
     try:
-        report = dynamics.analyze(title, stats, msgs, contacts)
+        report = dynamics.analyze(title, stats, msgs, contacts, focus=args.focus)
         out = f"# Group dynamics — {title}\n\n{dynamics.render_stats_table(stats)}\n\n{report}\n"
         if args.out:
             Path(args.out).write_text(out, encoding="utf-8")
@@ -247,6 +247,44 @@ def cmd_dynamics(args, db: ChatDB) -> int:
         print(f"_Skipping the AI read: {e}_")
         print("_(The stats above are still complete. Set ANTHROPIC_API_KEY for "
               "the full analysis.)_")
+    return 0
+
+
+def cmd_timeline(args, db: ChatDB) -> int:
+    from . import dynamics
+
+    contacts = load_contacts()
+    chat = _find_chat(db, args.chat, contacts)
+    if not chat:
+        print(f"No chat matched {args.chat!r}. Try `chats --groups` to list them.")
+        return 1
+    msgs = db.messages(chat.rowid)
+    if not msgs:
+        print("No messages to analyze.")
+        return 1
+    buckets = dynamics.bucket_by_period(msgs, by=args.by)
+    title = _title(chat, db, contacts)
+
+    print(f"# Dynamics over time — {title}")
+    print(f"_{len(msgs)} messages across {len(buckets)} {args.by}s "
+          f"({msgs[0].date:%Y-%m} → {msgs[-1].date:%Y-%m})_\n")
+    print(dynamics.timeline_share_table(buckets, contacts))
+
+    if args.no_ai:
+        return 0
+    print("\n---\n")
+    try:
+        report = dynamics.analyze_timeline(title, buckets, contacts, focus=args.focus)
+        if args.out:
+            out = (f"# Dynamics over time — {title}\n\n"
+                   f"{dynamics.timeline_share_table(buckets, contacts)}\n\n{report}\n")
+            Path(args.out).write_text(out, encoding="utf-8")
+            print(f"(Wrote full report to {args.out})")
+        print(report)
+    except RuntimeError as e:
+        print(f"_Skipping the AI read: {e}_")
+        print("_(The table above is still complete. Set ANTHROPIC_API_KEY for "
+              "the narrative.)_")
     return 0
 
 
@@ -355,9 +393,29 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sp.add_argument("chat", help="Chat id, name, or participant names (e.g. Moulton-Barry).")
     sp.add_argument("--days", type=int, default=0, help="Only analyze the last N days.")
+    sp.add_argument(
+        "--focus", choices=["balanced", "tension", "humor", "engagement"],
+        default="balanced", help="Sharpen the read toward one dimension.",
+    )
     sp.add_argument("--no-ai", action="store_true", help="Local stats only, no API call.")
     sp.add_argument("--out", help="Also write the full report to this markdown file.")
     sp.set_defaults(func=cmd_dynamics)
+
+    sp = sub.add_parser(
+        "timeline", help="How a group chat's dynamics shifted over time."
+    )
+    sp.add_argument("chat", help="Chat id, name, or participant names.")
+    sp.add_argument(
+        "--by", choices=["year", "quarter", "month"], default="year",
+        help="Time bucket size (default: year).",
+    )
+    sp.add_argument(
+        "--focus", choices=["balanced", "tension", "humor", "engagement"],
+        default="balanced", help="Sharpen the narrative toward one dimension.",
+    )
+    sp.add_argument("--no-ai", action="store_true", help="Local share table only.")
+    sp.add_argument("--out", help="Also write the full report to this markdown file.")
+    sp.set_defaults(func=cmd_timeline)
 
     sp = sub.add_parser(
         "followups", help="Prioritized list of messages awaiting your reply."
