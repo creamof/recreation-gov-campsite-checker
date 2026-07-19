@@ -103,6 +103,13 @@ imessage-insights dynamics "Moulton-Barry" --focus humor       # who's actually 
 imessage-insights dynamics "Moulton-Barry" --focus engagement  # who carries it vs. who's drifting
 ```
 
+**Zoom into a past window** with `--since` / `--until` (great for investigating
+when someone went quiet):
+
+```bash
+imessage-insights dynamics "Moulton-Barry" --since 2025-03-01 --until 2025-07-31 --focus tension
+```
+
 You can name a chat by its group name, by any substring, or by the members
 (`"Moulton-Barry"` matches a group containing both Moulton and Barry). Use
 `chats --groups` to see the exact names and ids.

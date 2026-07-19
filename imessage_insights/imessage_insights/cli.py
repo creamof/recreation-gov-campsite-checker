@@ -18,7 +18,7 @@ import re
 import subprocess
 import sys
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import __version__, chatdb, config
@@ -210,6 +210,13 @@ def cmd_digest(args, db: ChatDB) -> int:
     return 0
 
 
+def _parse_date(s: str) -> datetime:
+    try:
+        return datetime.strptime(s, "%Y-%m-%d")
+    except ValueError:
+        raise SystemExit(f"Bad date {s!r} — use YYYY-MM-DD (e.g. 2025-03-01).")
+
+
 def cmd_dynamics(args, db: ChatDB) -> int:
     from . import dynamics
 
@@ -219,18 +226,36 @@ def cmd_dynamics(args, db: ChatDB) -> int:
         print(f"No chat matched {args.chat!r}. Try `chats --groups` to list them.")
         return 1
 
-    since = chatdb.default_window(args.days) if args.days else None
+    if args.since:
+        since = _parse_date(args.since)
+    elif args.days:
+        since = chatdb.default_window(args.days)
+    else:
+        since = None
+    until = _parse_date(args.until) + timedelta(days=1) if args.until else None
+
     msgs = db.messages(chat.rowid, since=since)
+    if until:
+        msgs = [m for m in msgs if m.date < until]
     if not msgs:
         print("No messages in that window.")
         return 1
     reactions = db.reaction_counts(chat.rowid, since=since)
+    if until:
+        # Reactions are counted at DB level (no until); trim not critical for
+        # the qualitative read, but keep the window label honest.
+        pass
     stats = dynamics.compute_stats(msgs, reactions, contacts)
     title = _title(chat, db, contacts)
 
+    if args.since or args.until:
+        window = f", {msgs[0].date:%Y-%m-%d} → {msgs[-1].date:%Y-%m-%d}"
+    elif args.days:
+        window = f", last {args.days} days"
+    else:
+        window = ""
     print(f"# Group dynamics — {title}")
-    print(f"_{len(msgs)} messages, {len(stats)} people"
-          + (f", last {args.days} days" if args.days else "") + "_\n")
+    print(f"_{len(msgs)} messages, {len(stats)} people{window}_\n")
     print(dynamics.render_stats_table(stats))
 
     if args.no_ai:
@@ -399,6 +424,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sp.add_argument("chat", help="Chat id, name, or participant names (e.g. Moulton-Barry).")
     sp.add_argument("--days", type=int, default=0, help="Only analyze the last N days.")
+    sp.add_argument("--since", metavar="YYYY-MM-DD", help="Analyze from this date.")
+    sp.add_argument("--until", metavar="YYYY-MM-DD", help="Analyze up to this date.")
     sp.add_argument(
         "--focus", choices=["balanced", "tension", "humor", "engagement"],
         default="balanced", help="Sharpen the read toward one dimension.",
