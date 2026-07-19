@@ -107,6 +107,33 @@ imessage-insights draft "Mom" --copy 2              # copy option 2 to the clipb
 `--copy N` puts option N on your clipboard so you can paste it straight into
 Messages. From the menu, just pick **Draft a reply in my voice**.
 
+## The visual report — one command, the whole picture
+
+`report` builds a polished HTML report for a group chat and opens it in your
+browser (File → Print for a PDF). No extra installs — charts are pure SVG.
+
+```bash
+imessage-insights report "Moulton-Barry"                  # full report
+imessage-insights report "Moulton-Barry" --focus tension  # AI sections use a lens
+imessage-insights report "Moulton-Barry" --no-ai          # charts only, no API
+```
+
+What's inside:
+
+- **Who carries the conversation** — each person's share per quarter (line chart)
+- **The chat's pulse** — messages per month across its whole history
+- **When the chat is alive** — day-of-week × hour heatmap
+- **The reaction economy** — messages sent vs. reactions given (talkers vs. appreciators)
+- **Who replies to whom** — the reply-network matrix; reveals pairs and subgroups
+- **Who leaves you hanging** — median reply time per person
+- **Warmth & laughter over time** — affection and humor trends by quarter
+- **Signatures** — each person's favorite emoji and catchphrases (running-joke detector)
+- **The big days** — the busiest days ever, each with an AI one-line caption
+- **The AI reads** — the dynamics analysis and era-by-era story, embedded
+
+Reports land in `~/.imessage-insights/reports/`. From the menu, it's option
+**3) Full visual report on a group chat**.
+
 ## Group-chat dynamics — read the room
 
 `dynamics` profiles a group thread: who talks, who's funny, who's checked out,

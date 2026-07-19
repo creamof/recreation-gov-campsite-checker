@@ -270,6 +270,189 @@ def cmd_draft(args, db: ChatDB) -> int:
     return 0
 
 
+def _md_to_html(md: str) -> str:
+    """Minimal markdown → HTML for embedding AI reads in the report."""
+    import html as _html
+
+    out = []
+    for line in md.split("\n"):
+        s = line.strip()
+        if s.startswith("|"):
+            continue  # stats tables are rendered separately as charts
+        s = _html.escape(s)
+        s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
+        if s.startswith("# "):
+            out.append(f"<h1>{s[2:]}</h1>")
+        elif s.startswith("## "):
+            out.append(f"<h2>{s[3:]}</h2>")
+        elif s.startswith("- ") or s.startswith("* "):
+            out.append(f"<div>• {s[2:]}</div>")
+        elif s.startswith("&gt; "):
+            out.append(f"<blockquote>{s[5:]}</blockquote>")
+        elif s:
+            out.append(f"<p>{s}</p>")
+    return "".join(out)
+
+
+def cmd_report(args, db: ChatDB) -> int:
+    from . import analytics, dynamics, htmlreport
+    from .contacts import notes as people_notes  # noqa: F401  (loaded for cache)
+
+    contacts = load_contacts()
+    chat = _find_chat(db, args.chat, contacts)
+    if not chat:
+        print(f"No chat matched {args.chat!r}. Try `chats --groups` to list them.")
+        return 1
+    msgs = db.messages(chat.rowid)
+    if len(msgs) < 20:
+        print("Not enough messages in that chat for a report.")
+        return 1
+    title = _title(chat, db, contacts)
+    print(f"Building report for {title} ({len(msgs):,} messages)…")
+
+    reactions = db.reaction_counts(chat.rowid)
+    stats = dynamics.compute_stats(msgs, reactions, contacts)
+    sections: list[str] = []
+
+    # 1. Conversation share over time
+    periods, series = analytics.share_over_time(msgs, contacts)
+    if len(periods) >= 2:
+        sections.append(htmlreport.section(
+            "Who carries the conversation",
+            "Each person's share of messages per quarter.",
+            htmlreport.line_chart(periods, series),
+        ))
+
+    # 2. Monthly volume
+    sections.append(htmlreport.section(
+        "The chat's pulse", "Messages per month across its whole history.",
+        htmlreport.bar_chart(analytics.monthly_volume(msgs)),
+    ))
+
+    # 3. Rhythms heatmap
+    sections.append(htmlreport.section(
+        "When the chat is alive", "Message volume by day of week and hour.",
+        htmlreport.heatmap(analytics.hourly_heatmap(msgs)),
+    ))
+
+    # 4. Reaction economy
+    pts = [(s.name, float(s.messages), float(s.reactions_given))
+           for s in stats if s.messages >= 5]
+    sections.append(htmlreport.section(
+        "The reaction economy",
+        "Talkers vs. appreciators: messages sent vs. reactions (tapbacks) given.",
+        htmlreport.scatter(pts, "messages sent", "reactions given"),
+    ))
+
+    # 5. Reply network
+    people, edges = analytics.reply_network(msgs, contacts)
+    sections.append(htmlreport.section(
+        "Who replies to whom",
+        "Replies within an hour of another person's message. Bright cells are "
+        "strong response pairs; empty rows are broadcasters.",
+        htmlreport.matrix(people, edges),
+    ))
+
+    # 6. Response times
+    rt = analytics.response_times(msgs, contacts)
+    rows = [(n, d["replies_after"]) for n, d in rt.items()
+            if d["replies_after"] is not None and d["n"] >= 20]
+    rows.sort(key=lambda kv: kv[1])
+    if rows:
+        sections.append(htmlreport.section(
+            "Who leaves you hanging",
+            "Median time each person takes to reply when the chat is active "
+            "(fastest first).",
+            htmlreport.hbar_chart(
+                [(n, v, htmlreport._fmt_dur(v)) for n, v in rows]),
+        ))
+
+    # 7. Warmth trend
+    wl, warm, laugh = analytics.warmth_trend(msgs)
+    if len(wl) >= 2:
+        sections.append(htmlreport.section(
+            "Warmth & laughter over time",
+            "Share of messages with affection markers (hearts, 'love', thanks) "
+            "vs. laughter, per quarter.",
+            htmlreport.line_chart(wl, {"Warmth": warm, "Laughter": laugh}),
+        ))
+
+    # 8. Signatures
+    sigs = analytics.signatures(msgs, contacts)
+    cards = []
+    for name, s in sigs.items():
+        emoji = "".join(e for e, _ in s["emoji"]) or "—"
+        words = ", ".join(w for w, _ in s["words"]) or "—"
+        phrases = ", ".join(f"“{p}”" for p, _ in s["phrases"])
+        cards.append(
+            f"<div class='card'><h3>{htmlreport._e(name)}</h3>"
+            f"<div class='emoji'>{emoji}</div>"
+            f"<div class='terms'><b>Their words:</b> {htmlreport._e(words)}</div>"
+            + (f"<div class='terms'><b>Catchphrases:</b> {htmlreport._e(phrases)}</div>" if phrases else "")
+            + "</div>"
+        )
+    sections.append(
+        f"<h2>Signatures</h2><p class='note'>Each person's favorite emoji and "
+        f"most distinctive vocabulary.</p><div class='sig'>{''.join(cards)}</div>"
+    )
+
+    # 9. Peak days (+ AI captions)
+    days = analytics.peak_days(msgs)
+    captions: dict[str, str] = {}
+    use_ai = not args.no_ai
+    if use_ai and days:
+        try:
+            print("  Asking Claude for peak-day captions…")
+            captions = analytics.caption_peak_days(days, contacts)
+        except RuntimeError as e:
+            print(f"  (Skipping AI captions: {e})")
+            use_ai = False
+    rows_html = "".join(
+        f"<div class='peak'><span class='d'>{d['date']}</span>"
+        f"<span class='n'>{d['count']} msgs</span>"
+        f"<span>{htmlreport._e(captions.get(d['date'], ''))}</span></div>"
+        for d in days
+    )
+    sections.append(htmlreport.section(
+        "The big days", "The busiest days in the chat's history.", rows_html))
+
+    # 10. AI reads
+    if use_ai:
+        try:
+            print("  Asking Claude for the dynamics read…")
+            read = dynamics.analyze(title, stats, msgs, contacts, focus=args.focus)
+            sections.append(htmlreport.section(
+                "The read: roles, humor & pot-stirring",
+                "Claude's qualitative analysis, grounded in quoted messages.",
+                f"<div class='ai'>{_md_to_html(read)}</div>"))
+            print("  Asking Claude for the timeline narrative…")
+            buckets, _ = dynamics.filter_periods(
+                dynamics.bucket_by_period(msgs, by="year"))
+            story = dynamics.analyze_timeline(title, buckets, contacts,
+                                              focus=args.focus)
+            sections.append(htmlreport.section(
+                "The story over time",
+                "How the group evolved, era by era.",
+                f"<div class='ai'>{_md_to_html(story)}</div>"))
+        except RuntimeError as e:
+            print(f"  (Skipping AI reads: {e})")
+
+    out_dir = Path(args.out).parent if args.out else config.OUTPUT_DIR / "reports"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    safe = re.sub(r"[^A-Za-z0-9 _-]", "", title).strip().replace(" ", "-") or "chat"
+    out_path = (Path(args.out) if args.out
+                else out_dir / f"{safe}-{datetime.now():%Y-%m-%d}.html")
+    subtitle = (f"{len(msgs):,} messages · {len(stats)} people · "
+                f"{msgs[0].date:%b %Y} – {msgs[-1].date:%b %Y}")
+    out_path.write_text(htmlreport.build(f"{title} — Group Report", subtitle,
+                                         sections), encoding="utf-8")
+    print(f"\n✓ Report written to {out_path}")
+    if not args.no_open and sys.platform == "darwin":
+        subprocess.run(["open", str(out_path)], check=False)
+        print("  (Opened in your browser — use File → Print for a PDF.)")
+    return 0
+
+
 def cmd_setup(args, db: ChatDB) -> int:
     from . import settings
 
@@ -308,10 +491,11 @@ def run_menu(db: ChatDB) -> int:
 ========  iMessage Insights  ========
   1) Who's waiting on my reply
   2) Draft a reply in my voice
-  3) Analyze a group chat
-  4) List my chats
-  5) Set up automatic reminders
-  6) Settings (API key)
+  3) Full visual report on a group chat
+  4) Quick text analysis of a group chat
+  5) List my chats
+  6) Set up automatic reminders
+  7) Settings (API key)
   0) Quit
 """)
         try:
@@ -334,15 +518,22 @@ def run_menu(db: ChatDB) -> int:
             if name:
                 focus = input("Focus — balanced / tension / humor / engagement "
                               "[balanced]: ").strip() or "balanced"
+                cmd_report(_ns(chat=name, focus=focus, no_ai=False,
+                               no_open=False, out=None), db)
+        elif choice == "4":
+            name = input("Which group chat? ").strip()
+            if name:
+                focus = input("Focus — balanced / tension / humor / engagement "
+                              "[balanced]: ").strip() or "balanced"
                 cmd_dynamics(_ns(chat=name, days=0, since=None, until=None,
                                  focus=focus, no_ai=False, out=None), db)
-        elif choice == "4":
-            cmd_chats(_ns(groups=False, days=0, limit=30), db)
         elif choice == "5":
+            cmd_chats(_ns(groups=False, days=0, limit=30), db)
+        elif choice == "6":
             times = input(f"Reminder times [{config.DEFAULT_REMINDER_TIMES}]: "
                           ).strip() or config.DEFAULT_REMINDER_TIMES
             cmd_schedule(_ns(action="install", times=times, db=None), db)
-        elif choice == "6":
+        elif choice == "7":
             cmd_setup(_ns(force=True), db)
         else:
             print("Didn't recognize that — pick a number from the list.")
@@ -610,6 +801,21 @@ def build_parser() -> argparse.ArgumentParser:
         help='Comma-separated HH:MM times, e.g. "9:00,13:00,17:30".',
     )
     sp.set_defaults(func=cmd_schedule, needs_db=False)
+
+    sp = sub.add_parser(
+        "report", help="Full visual HTML report for a group chat (charts + AI reads)."
+    )
+    sp.add_argument("chat", help="Chat id, name, or participant names.")
+    sp.add_argument(
+        "--focus", choices=["balanced", "tension", "humor", "engagement"],
+        default="balanced", help="Lens for the AI sections.",
+    )
+    sp.add_argument("--no-ai", action="store_true",
+                    help="Charts and stats only — no API calls.")
+    sp.add_argument("--no-open", action="store_true",
+                    help="Don't auto-open the report in the browser.")
+    sp.add_argument("--out", help="Output path (default ~/.imessage-insights/reports/).")
+    sp.set_defaults(func=cmd_report)
 
     sp = sub.add_parser("draft", help="Draft reply options in your voice for a thread.")
     sp.add_argument("chat", help="Chat id, name, or participant names.")
