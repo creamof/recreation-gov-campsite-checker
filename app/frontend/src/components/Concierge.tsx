@@ -4,11 +4,6 @@ import { askConcierge, preparePlan } from "../api";
 import ParkArt from "./ParkArt";
 import TimelineView from "./TimelineView";
 
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
 const EXAMPLES = [
   "Waterfalls and granite in Yosemite with the kids in July",
   "I finally want to summit Half Dome this summer",
@@ -25,7 +20,6 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
 
 export default function Concierge({ onOpenPark }: { onOpenPark: (slug: string) => void }) {
   const [query, setQuery] = useState("");
-  const [month, setMonth] = useState<number | "">("");
   const [result, setResult] = useState<ConciergeResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +42,8 @@ export default function Concierge({ onOpenPark }: { onOpenPark: (slug: string) =
     setPlan(null);
     setPlanFor(null);
     try {
-      setResult(await askConcierge({ query: q, month: month || null }));
+      // Month/season is parsed straight from the free text by the backend.
+      setResult(await askConcierge({ query: q }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
@@ -62,7 +57,7 @@ export default function Concierge({ onOpenPark }: { onOpenPark: (slug: string) =
     setPlanError(null);
     setPlan(null);
     try {
-      const monthNum = result ? new Date(result.arrival + "T00:00:00").getMonth() + 1 : month || undefined;
+      const monthNum = result ? new Date(result.arrival + "T00:00:00").getMonth() + 1 : undefined;
       const yearNum = result ? new Date(result.arrival + "T00:00:00").getFullYear() : undefined;
       setPlan(
         await preparePlan({
@@ -112,15 +107,10 @@ export default function Concierge({ onOpenPark }: { onOpenPark: (slug: string) =
           }}
         />
         <div className="ask-controls">
-          <label className="inline">
-            Month
-            <select value={month} onChange={(e) => setMonth(e.target.value ? Number(e.target.value) : "")}>
-              <option value="">From my words / flexible</option>
-              {MONTHS.map((m, i) => (
-                <option key={m} value={i + 1}>{m}</option>
-              ))}
-            </select>
-          </label>
+          <p className="muted small">
+            Mention a month or season if you have one in mind — "in July", "this summer" — or leave
+            it out and I'll suggest the best timing.
+          </p>
           <button className="primary slim" onClick={() => ask()} disabled={loading || !query.trim()}>
             {loading ? "Thinking…" : "Find my trips"}
           </button>

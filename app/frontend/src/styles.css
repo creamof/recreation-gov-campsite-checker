@@ -183,6 +183,8 @@ code { background: #0c281c; padding: 1px 5px; border-radius: 5px; }
 }
 .ask-box textarea:focus { border-color: var(--accent); }
 .ask-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.ask-controls p { margin: 0; flex: 1 1 220px; }
+.ask-controls .primary { flex-shrink: 0; }
 button.primary.slim { width: auto; margin-top: 0; padding: 11px 18px; }
 .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .example-chip {
