@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { TimelinePlan, TimelineStep } from "../types";
-import { downloadIcs } from "../api";
+import { createWatch, downloadIcs } from "../api";
 
 const KIND_ICON: Record<TimelineStep["kind"], string> = {
   prep: "🧭",
@@ -29,9 +29,44 @@ function fmt(when: string | null): string {
   return d.toLocaleString(undefined, opts);
 }
 
-export default function TimelineView({ plan }: { plan: TimelinePlan }) {
+function daysUntil(iso: string): number {
+  return Math.ceil((new Date(iso + "T00:00:00").getTime() - Date.now()) / 86_400_000);
+}
+
+export default function TimelineView({
+  plan,
+  onOpenWatches,
+  onWatchCreated,
+}: {
+  plan: TimelinePlan;
+  onOpenWatches?: () => void;
+  onWatchCreated?: () => void;
+}) {
   const [exportState, setExportState] = useState<"idle" | "busy" | "done" | "error">("idle");
+  const [watchState, setWatchState] = useState<"idle" | "busy" | "done" | "error">("idle");
   const exportable = plan.steps.filter((s) => s.when && !s.is_past).length;
+
+  // "Too close to plan the normal way" → suggest watching for cancellations.
+  // Only campgrounds can be watched (permits are lotteries, not inventory).
+  const windowPassed = plan.steps.some((s) => s.kind === "critical" && s.is_past);
+  const suggestWatch =
+    plan.target.entity_type === "campground" && (windowPassed || daysUntil(plan.arrival) <= 14);
+
+  async function startWatch() {
+    setWatchState("busy");
+    try {
+      await createWatch({
+        campground_id: plan.target.id,
+        name: plan.target.name,
+        arrival: plan.arrival,
+        departure: plan.departure,
+      });
+      setWatchState("done");
+      onWatchCreated?.();
+    } catch {
+      setWatchState("error");
+    }
+  }
 
   async function exportCalendar() {
     setExportState("busy");
@@ -98,15 +133,50 @@ export default function TimelineView({ plan }: { plan: TimelinePlan }) {
         ))}
       </ol>
 
-      <div className="watch-cta card">
-        <div>
-          <strong>Don't let a date slip.</strong>
-          <p className="muted">
-            The calendar export above puts every deadline on your phone with built-in alarms — a
-            day-before nudge plus a 30-minute warning for window-open moments. Live cancellation
-            watches with push alerts are the next milestone.
-          </p>
-        </div>
+      <div className={`watch-cta card ${suggestWatch && watchState !== "done" ? "watch-urgent" : ""}`}>
+        {suggestWatch ? (
+          watchState === "done" ? (
+            <div>
+              <strong>✅ Watching {plan.target.name}</strong>
+              <p className="muted">
+                You'll get an alert here the moment a site frees up for your dates.{" "}
+                {onOpenWatches && (
+                  <button className="link" onClick={onOpenWatches}>
+                    View your watches →
+                  </button>
+                )}
+              </p>
+            </div>
+          ) : (
+            <div className="watch-suggest">
+              <div>
+                <strong>{windowPassed ? "The prime booking moment has passed." : "Cutting it close."}</strong>
+                <p className="muted">
+                  Sold out isn't the end — people cancel constantly. Watch {plan.target.name} for
+                  your dates and grab a spot the moment one frees up.
+                </p>
+              </div>
+              <div>
+                <button className="primary slim" onClick={startWatch} disabled={watchState === "busy"}>
+                  {watchState === "busy" ? "Setting up…" : "🔔 Watch for cancellations"}
+                </button>
+                {watchState === "error" && (
+                  <p className="error small" role="alert">
+                    Couldn't set up the watch — try again.
+                  </p>
+                )}
+              </div>
+            </div>
+          )
+        ) : (
+          <div>
+            <strong>Don't let a date slip.</strong>
+            <p className="muted">
+              The calendar export above puts every deadline on your phone with built-in alarms — a
+              day-before nudge plus a 30-minute warning for window-open moments.
+            </p>
+          </div>
+        )}
       </div>
     </section>
   );

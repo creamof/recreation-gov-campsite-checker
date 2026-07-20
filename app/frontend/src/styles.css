@@ -49,6 +49,7 @@ h1, h2, h3, h4 { font-family: var(--serif); font-weight: 640; letter-spacing: -0
 .brand h1 { margin: 0; font-size: 26px; font-weight: 700; }
 .brand p { margin: 1px 0 0; color: var(--muted); font-size: 12.5px; letter-spacing: 0.02em; }
 
+.nav-row { display: flex; gap: 8px; align-items: stretch; }
 .tabs { display: flex; gap: 5px; background: #0e2418; padding: 5px; border-radius: 13px; border: 1px solid var(--line-soft); }
 .tabs button {
   background: transparent; color: var(--muted); border: 0;
@@ -57,6 +58,17 @@ h1, h2, h3, h4 { font-family: var(--serif); font-weight: 640; letter-spacing: -0
 }
 .tabs button:hover { color: var(--cream); }
 .tabs button.active { background: var(--accent); color: #24130a; }
+
+.bell-btn {
+  position: relative; background: #0e2418; border: 1px solid var(--line-soft); border-radius: 13px;
+  padding: 0 15px; font-size: 17px; cursor: pointer; line-height: 1;
+}
+.bell-btn.active { background: var(--accent); border-color: var(--accent); }
+.bell-badge {
+  position: absolute; top: -6px; right: -6px; background: var(--danger); color: #fff;
+  border-radius: 999px; font-size: 11px; font-weight: 700; font-family: var(--sans);
+  min-width: 18px; height: 18px; display: grid; place-items: center; padding: 0 4px;
+}
 
 /* ---------------------------------------------------------------- shared */
 .eyebrow {
@@ -324,6 +336,21 @@ button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .alert-actions { display: flex; align-items: center; gap: 14px; }
 .book-link { text-decoration: none; background: var(--gold); color: #241a04; border-radius: 10px; padding: 9px 14px; font-weight: 700; font-size: 13.5px; }
 
+.direct-plan { margin-top: 20px; }
+.direct-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.direct-head strong { color: var(--cream); }
+.direct-head p { margin: 3px 0 0; }
+.direct-plan .search-panel { margin-top: 14px; }
+
+.lottery-link-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 20px; }
+.lottery-link-card strong { color: var(--cream); }
+.lottery-link-card p { margin: 3px 0 0; }
+
+.watch-suggest { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.watch-suggest p { margin: 4px 0 0; }
+.watch-cta.watch-urgent { border-color: var(--accent); }
+.link.back { display: inline-block; margin-bottom: 10px; }
+
 .new-watch { margin: 16px 0; }
 .new-watch h3 { margin: 0 0 4px; font-size: 19px; color: var(--cream); }
 
@@ -371,10 +398,11 @@ button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
   .park-hero-text { padding: 0 20px 22px; }
   .park-hero-art { min-height: 200px; }
   .topbar { flex-direction: column; align-items: flex-start; }
-  /* 5 tabs have to share a phone's width. Let each button shrink below its
-     text (min-width:0 defeats the flex default of min-width:auto, which was
-     making the last tab overflow the rounded container) and trim padding/font
-     so all five fit inside the border cleanly. */
-  .tabs { width: 100%; }
-  .tabs button { flex: 1; min-width: 0; padding: 9px 5px; font-size: 12.5px; text-align: center; line-height: 1.25; }
+  /* The tab bar shares the phone's width with the bell. min-width:0 defeats
+     the flex default of min-width:auto so buttons can never overflow the
+     rounded container. */
+  .nav-row { width: 100%; }
+  .tabs { flex: 1; }
+  .tabs button { flex: 1; min-width: 0; padding: 9px 8px; }
+  .direct-head, .lottery-link-card { flex-direction: column; align-items: flex-start; }
 }

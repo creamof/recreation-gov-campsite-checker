@@ -191,7 +191,7 @@ one — only worth it if you want Vercel's CDN for the static assets.
 - Open the URL on your phone → **Add to Home Screen** to install the PWA.
 - For push that reaches you with the app closed: `npx web-push
   generate-vapid-keys`, set the three `TRAILHEAD_VAPID_*` env vars, redeploy,
-  then hit **Enable notifications** in the Watches tab.
+  then hit **Enable notifications** in Watches (the 🔔 bell in the top bar).
 - Optional: set `ANTHROPIC_API_KEY` to upgrade the concierge's language
   parsing to Claude.
 - Be a good citizen: keep `TRAILHEAD_WATCH_INTERVAL` at 300+ seconds.
