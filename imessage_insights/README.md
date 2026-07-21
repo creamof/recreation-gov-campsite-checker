@@ -37,13 +37,20 @@ Forwarding).
    to open a simple menu — no commands to remember. (Everything also works by
    typing `python3 -m imessage_insights <command>`.)
 
-3. **Add your API key** (needed for the AI features — draft replies, briefings):
+3. **Choose how the AI runs** (for draft replies, ranking, briefings):
    ```bash
    python3 -m imessage_insights setup
    ```
-   Paste your key from [console.anthropic.com](https://console.anthropic.com); it's
-   saved privately to `~/.imessage-insights/config.json` (no need to edit your
-   shell profile). You can also do this from the menu → **Settings**.
+   You'll pick one:
+   - **Local & private (recommended)** — an open model (Llama) on your Mac via
+     [Ollama](https://ollama.com). Nothing leaves your machine; free. One-time:
+     install Ollama, then `ollama pull llama3.1`. Best on Apple Silicon with
+     ~16GB RAM (use `IMSG_LOCAL_MODEL=llama3.2:3b` on a lighter Mac).
+   - **Cloud** — Anthropic's Claude (best quality; sends text to the API). Paste
+     your key from [console.anthropic.com](https://console.anthropic.com).
+
+   Your choice is saved to `~/.imessage-insights/config.json` (no shell-profile
+   edits). Switch anytime by re-running `setup`.
 
 4. **Verify access.**
    ```bash

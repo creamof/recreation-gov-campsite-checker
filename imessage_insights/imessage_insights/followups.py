@@ -128,13 +128,10 @@ Return one entry per thread id. Be decisive; don't over-flag."""
 
 
 def _llm_rank(items: list[Followup], contacts: dict[str, str]) -> bool:
-    """Populate urgency/reason/needs_reply via Claude. Returns True on success."""
+    """Populate urgency/reason/needs_reply via the model. Returns True on success."""
     if not items:
         return False
-    try:
-        import anthropic
-    except ImportError:
-        return False
+    from . import model
 
     blocks = []
     for f in items:
@@ -148,23 +145,12 @@ def _llm_rank(items: list[Followup], contacts: dict[str, str]) -> bool:
         )
     prompt = "Triage these threads:\n\n" + "\n\n".join(blocks)
 
-    client = anthropic.Anthropic()
-    response = client.messages.create(
-        model=config.MODEL,
-        max_tokens=4000,
-        system=_RANK_SYSTEM,
-        thinking={"type": "adaptive"},
-        output_config={"effort": config.EFFORT, "format": {
-            "type": "json_schema", "schema": _RANK_SCHEMA,
-        }},
-        messages=[{"role": "user", "content": prompt}],
-    )
-    if response.stop_reason == "refusal":
+    text = model.generate(_RANK_SYSTEM, prompt, max_tokens=4000, schema=_RANK_SCHEMA)
+    if not text:
         return False
 
     import json
 
-    text = next((b.text for b in response.content if b.type == "text"), "")
     verdicts = {v["id"]: v for v in json.loads(text).get("items", [])}
     by_id = {f.chat.rowid: f for f in items}
     for cid, v in verdicts.items():

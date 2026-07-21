@@ -43,7 +43,7 @@ def draft_replies(
     about: str | None = None,
 ) -> list[str]:
     """Return `n` reply-option strings in the user's voice."""
-    from .insights import _client
+    from . import model
 
     me = me_label()
     voice_block = "\n".join(f"- {t}" for t in voice[:250])
@@ -58,18 +58,11 @@ def draft_replies(
         f"Write {n} distinct reply options {me} could send next."
     )
 
-    response = _client().messages.create(
-        model=config.MODEL,
-        max_tokens=1500,
-        system=_SYSTEM,
-        output_config={"format": {"type": "json_schema", "schema": _SCHEMA}},
-        messages=[{"role": "user", "content": prompt}],
-    )
-    if response.stop_reason == "refusal":
+    text = model.generate(_SYSTEM, prompt, max_tokens=1500, schema=_SCHEMA)
+    if not text:
         return []
     import json
 
-    text = next((b.text for b in response.content if b.type == "text"), "")
     try:
         return [d.strip() for d in json.loads(text).get("drafts", []) if d.strip()]
     except json.JSONDecodeError:

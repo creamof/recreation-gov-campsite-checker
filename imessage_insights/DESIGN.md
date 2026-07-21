@@ -169,4 +169,25 @@ Each phase is shippable on its own and reuses code already written and tested.
 | What needs a reply | Smart priority (Claude-ranked; group noise filtered) |
 | Analysis cadence | Automatic weekly digest + on-demand deep report |
 | Sending | Draft-only, forever. Copy → paste → you send. |
-| Model | `claude-opus-4-8` (configurable via `IMSG_MODEL`) |
+| Model | **Local-first: an open model (Llama) via Ollama by default; Claude optional for top-quality analysis.** Swappable via one setting. |
+
+## Model backend (local-first)
+
+All AI features go through one function, `model.generate()`, so the choice of
+where the intelligence runs is a single setting, not scattered code.
+
+- **Local (default): an open Llama model via [Ollama](https://ollama.com).**
+  Runs on the Mac; message text never leaves the machine; free. Reached over
+  `http://localhost:11434` using only the standard library (no extra install in
+  this tool). Requires the one-time Ollama install + `ollama pull llama3.1`.
+- **Cloud (optional): Claude.** Better at the nuanced analysis ("who stirs the
+  pot") and slightly sharper voice drafts. Sends text to the Anthropic API.
+
+Chosen once in `setup`. Because the always-on triage loop scans *all* messages
+every cycle, running it on the local model keeps the bulk of your data on-device
+by default. You can point the occasional deep analysis at Claude if you want the
+extra quality, without changing anything else.
+
+Model requirements: Ollama runs best on Apple Silicon; `llama3.1` (8B) wants
+~16GB RAM. On a lighter Mac, set a smaller model (e.g. `llama3.2:3b`) via
+`IMSG_LOCAL_MODEL`.

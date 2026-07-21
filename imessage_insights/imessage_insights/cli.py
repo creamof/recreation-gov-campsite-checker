@@ -454,26 +454,50 @@ def cmd_report(args, db: ChatDB) -> int:
 
 
 def cmd_setup(args, db: ChatDB) -> int:
-    from . import settings
+    from . import model, settings
 
     print("iMessage Insights — setup\n")
     print(f"✓ Messages database readable ({db.message_count():,} messages).")
-    if settings.get_api_key() and not args.force:
-        print("✓ Anthropic API key already configured.")
-    else:
-        print("\nPaste your Anthropic API key (from console.anthropic.com → API "
-              "Keys). It's saved privately to ~/.imessage-insights/config.json.")
-        try:
-            key = getpass.getpass("API key (hidden as you type): ").strip()
-        except (EOFError, KeyboardInterrupt):
-            key = ""
-        if key:
-            settings.set_api_key(key)
-            print("✓ Saved.")
+
+    print("\nHow should the AI run?")
+    print("  1) Local & private — an open model on your Mac via Ollama.")
+    print("     Nothing leaves your machine. Free. (Recommended)")
+    print("  2) Cloud — Anthropic's Claude. Best quality; sends text to the API.")
+    try:
+        choice = input("Pick 1 or 2 [1]: ").strip() or "1"
+    except (EOFError, KeyboardInterrupt):
+        return 0
+
+    if choice == "2":
+        settings.update(backend="claude")
+        if settings.get_api_key() and not args.force:
+            print("✓ Claude API key already configured.")
         else:
-            print("Skipped — run `setup` again anytime to add it.")
-    print("\nAll set. From here you can: draft replies, get reply reminders, "
-          "or analyze a chat.")
+            print("Paste your key from console.anthropic.com (saved privately, "
+                  "0600, to ~/.imessage-insights/config.json).")
+            try:
+                key = getpass.getpass("API key (hidden): ").strip()
+            except (EOFError, KeyboardInterrupt):
+                key = ""
+            if key:
+                settings.set_api_key(key)
+                print("✓ Saved.")
+            else:
+                print("Skipped — run `setup` again to add it.")
+    else:
+        settings.update(backend="ollama")
+        mdl = model.local_model()
+        if model.ollama_available():
+            print(f"✓ Ollama is running. Using the '{mdl}' model.")
+            print(f"  (If you haven't yet:  ollama pull {mdl})")
+        else:
+            print("\nLocal mode uses Ollama — a free app that runs the model:")
+            print("  1. Install it:  https://ollama.com/download   (or: brew install ollama)")
+            print("  2. Open the Ollama app (or run:  ollama serve)")
+            print(f"  3. Download the model once:  ollama pull {mdl}")
+            print("Then you're set — re-run setup to confirm.")
+
+    print(f"\nAll set. AI backend: {model.describe()}.")
     return 0
 
 

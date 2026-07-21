@@ -35,6 +35,11 @@ def get_api_key() -> str | None:
 
 
 def set_api_key(key: str) -> None:
+    update(anthropic_api_key=key.strip())
+
+
+def update(**kw) -> None:
+    """Merge keys into the config file (e.g. backend='ollama')."""
     data = load()
-    data["anthropic_api_key"] = key.strip()
+    data.update(kw)
     save(data)
