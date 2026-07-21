@@ -460,21 +460,35 @@ def cmd_setup(args, db: ChatDB) -> int:
     print(f"✓ Messages database readable ({db.message_count():,} messages).")
 
     print("\nHow should the AI run?")
-    print("  1) Local & private — an open model on your Mac via Ollama.")
-    print("     Nothing leaves your machine. Free. (Recommended)")
-    print("  2) Cloud — Anthropic's Claude. Best quality; sends text to the API.")
+    print("  1) Cloud — Anthropic's Claude. Best quality, fast, works on any")
+    print("     Mac. Sends text to the API. (Recommended)")
+    print("  2) Local — an open model via Ollama. Private and free, but needs")
+    print("     an Apple-Silicon Mac to be usable (slow on Intel).")
     try:
         choice = input("Pick 1 or 2 [1]: ").strip() or "1"
     except (EOFError, KeyboardInterrupt):
         return 0
 
     if choice == "2":
+        settings.update(backend="ollama")
+        import platform
+        if platform.machine() != "arm64" and not settings.load().get("local_model"):
+            settings.update(local_model="llama3.2:3b")
+            print("\n(This looks like an Intel Mac — the model runs on the CPU "
+                  "and will be slow. Set a lighter model llama3.2:3b. Cloud is "
+                  "the better fit for this machine.)")
+        mdl = model.local_model()
+        if model.ollama_available():
+            print(f"✓ Ollama is running. Using '{mdl}'.  (First time:  ollama pull {mdl})")
+        else:
+            print(f"\nInstall Ollama (ollama.com), then:  ollama pull {mdl}")
+    else:
         settings.update(backend="claude")
         if settings.get_api_key() and not args.force:
             print("✓ Claude API key already configured.")
         else:
-            print("Paste your key from console.anthropic.com (saved privately, "
-                  "0600, to ~/.imessage-insights/config.json).")
+            print("Paste your key from console.anthropic.com → API Keys (saved "
+                  "privately, 0600, to ~/.imessage-insights/config.json).")
             try:
                 key = getpass.getpass("API key (hidden): ").strip()
             except (EOFError, KeyboardInterrupt):
@@ -484,26 +498,6 @@ def cmd_setup(args, db: ChatDB) -> int:
                 print("✓ Saved.")
             else:
                 print("Skipped — run `setup` again to add it.")
-    else:
-        settings.update(backend="ollama")
-        import platform
-        if platform.machine() != "arm64" and not settings.load().get("local_model"):
-            settings.update(local_model="llama3.2:3b")
-            print("\n(This looks like an Intel Mac — no Apple-Silicon "
-                  "acceleration, so the model runs on the CPU. I set a lighter, "
-                  "faster model: llama3.2:3b. Good for background use; a bit slow "
-                  "for instant drafts. You can send just the drafts to Cloud "
-                  "later if you want more speed/polish.)")
-        mdl = model.local_model()
-        if model.ollama_available():
-            print(f"✓ Ollama is running. Using the '{mdl}' model.")
-            print(f"  (If you haven't yet:  ollama pull {mdl})")
-        else:
-            print("\nLocal mode uses Ollama — a free app that runs the model:")
-            print("  1. Install it:  https://ollama.com/download   (or: brew install ollama)")
-            print("  2. Open the Ollama app (or run:  ollama serve)")
-            print(f"  3. Download the model once:  ollama pull {mdl}")
-            print("Then you're set — re-run setup to confirm.")
 
     print(f"\nAll set. AI backend: {model.describe()}.")
     return 0

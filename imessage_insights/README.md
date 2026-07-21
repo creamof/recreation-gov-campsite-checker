@@ -42,12 +42,12 @@ Forwarding).
    python3 -m imessage_insights setup
    ```
    You'll pick one:
-   - **Local & private (recommended)** — an open model (Llama) on your Mac via
-     [Ollama](https://ollama.com). Nothing leaves your machine; free. One-time:
-     install Ollama, then `ollama pull llama3.1`. Best on Apple Silicon with
-     ~16GB RAM (use `IMSG_LOCAL_MODEL=llama3.2:3b` on a lighter Mac).
-   - **Cloud** — Anthropic's Claude (best quality; sends text to the API). Paste
-     your key from [console.anthropic.com](https://console.anthropic.com).
+   - **Cloud (recommended)** — Anthropic's Claude: best quality, fast, works on
+     any Mac. Paste your key from [console.anthropic.com](https://console.anthropic.com).
+     (Anthropic doesn't train on API data; retention is configurable.)
+   - **Local** — an open model via [Ollama](https://ollama.com): private and
+     free, but needs an **Apple-Silicon** Mac to run at usable speed (slow on
+     Intel).
 
    Your choice is saved to `~/.imessage-insights/config.json` (no shell-profile
    edits). Switch anytime by re-running `setup`.

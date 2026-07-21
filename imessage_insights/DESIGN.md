@@ -169,25 +169,20 @@ Each phase is shippable on its own and reuses code already written and tested.
 | What needs a reply | Smart priority (Claude-ranked; group noise filtered) |
 | Analysis cadence | Automatic weekly digest + on-demand deep report |
 | Sending | Draft-only, forever. Copy → paste → you send. |
-| Model | **Local-first: an open model (Llama) via Ollama by default; Claude optional for top-quality analysis.** Swappable via one setting. |
+| Model | **Cloud (Claude) by default.** A swappable backend keeps a local option open, but local inference needs Apple Silicon to be usable, so cloud is the default. |
 
-## Model backend (local-first)
+## Model backend
 
-All AI features go through one function, `model.generate()`, so the choice of
-where the intelligence runs is a single setting, not scattered code.
+All AI features go through one function, `model.generate()`, so the intelligence
+provider is a single setting, not scattered code.
 
-- **Local (default): an open Llama model via [Ollama](https://ollama.com).**
-  Runs on the Mac; message text never leaves the machine; free. Reached over
-  `http://localhost:11434` using only the standard library (no extra install in
-  this tool). Requires the one-time Ollama install + `ollama pull llama3.1`.
-- **Cloud (optional): Claude.** Better at the nuanced analysis ("who stirs the
-  pot") and slightly sharper voice drafts. Sends text to the Anthropic API.
+- **Cloud (default): Claude.** Fast, best quality, works on any Mac. Sends text
+  to the Anthropic API (which doesn't train on API data; retention is
+  configurable). This is the right default given typical hardware.
+- **Local (optional): an open model via [Ollama](https://ollama.com).** Fully
+  private and free, reached over `http://localhost:11434` with only the standard
+  library — but it needs an **Apple-Silicon** Mac to run at usable speed. On an
+  Intel Mac (CPU-only) it works but is slow; not recommended there.
 
-Chosen once in `setup`. Because the always-on triage loop scans *all* messages
-every cycle, running it on the local model keeps the bulk of your data on-device
-by default. You can point the occasional deep analysis at Claude if you want the
-extra quality, without changing anything else.
-
-Model requirements: Ollama runs best on Apple Silicon; `llama3.1` (8B) wants
-~16GB RAM. On a lighter Mac, set a smaller model (e.g. `llama3.2:3b`) via
-`IMSG_LOCAL_MODEL`.
+Chosen once in `setup`. The abstraction means moving to a future Apple-Silicon
+Mac (or any other backend) is a one-line switch, with no other code changes.
