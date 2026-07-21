@@ -486,6 +486,14 @@ def cmd_setup(args, db: ChatDB) -> int:
                 print("Skipped — run `setup` again to add it.")
     else:
         settings.update(backend="ollama")
+        import platform
+        if platform.machine() != "arm64" and not settings.load().get("local_model"):
+            settings.update(local_model="llama3.2:3b")
+            print("\n(This looks like an Intel Mac — no Apple-Silicon "
+                  "acceleration, so the model runs on the CPU. I set a lighter, "
+                  "faster model: llama3.2:3b. Good for background use; a bit slow "
+                  "for instant drafts. You can send just the drafts to Cloud "
+                  "later if you want more speed/polish.)")
         mdl = model.local_model()
         if model.ollama_available():
             print(f"✓ Ollama is running. Using the '{mdl}' model.")
